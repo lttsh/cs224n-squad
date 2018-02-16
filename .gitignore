@@ -1,5 +1,12 @@
-# Dataset 
+# Dataset
 data/
 
-# Python 
+# Virtualenv
+.env/
+
+# Python
 *.pyc
+
+# Experiments 
+code/stats/
+experiments/

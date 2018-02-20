@@ -126,6 +126,50 @@ class BidirectionAttn(object):
         """
         self.keep_prob = keep_prob
         self.hidden_size = hidden_size
+    def build_similarity_matrix(self, questions, contexts):
+        """
+        Inputs:
+            questions: Hidden representations of questions (BS, M, 2H)
+            contexts: Hidden representations of contexts (BS, N, 2H)
+        Output:
+            similarity: similarity matrix (BS, N, M) where
+            S[_][i][j] = < w, [c_i, q_j, c_i o q_j]>
+        """
+        H = self.hidden_size
+        BS = tf.shape(questions)[0]
+        N = tf.shape(contexts)[1]
+        M = tf.shape(questions)[1]
+
+        w_sim_1 = tf.get_variable('w_sim_1', shape=(2*H)
+            initializer=tf.constant_initializer(0)) # 2 * H
+        w_sim_2 = tf.get_variable('w_sim_2', shape=(2*H)
+            initializer=tf.constant_initializer(0)) # 2 * H
+        w_sim_3 = tf.get_variable('w_sim_3', shape =(2*H)
+            initializer=tf.constant_initializer(0)) # 2 * H
+
+        # Compute matrix  of size BS x N x M x 2H which contains all c_i o q_j
+        q_tile = tf.tile(tf.expand_dims(questions, 0), [N, 1, 1, 1]) #  N x BS x M x 2H
+        q_tile = tf.transpose(q_tile, (1, 0, 3, 2)) # BS x N x 2H x M
+
+        contexts = tf.expand_dims(contexts, -1) # BS x N x 2H x 1
+        result = (contexts * q_tile) # BS x N x 2H x M
+        tf.assert_equal(tf.shape(result), [BS, N, 2 * H, M])
+        result = tf.transpose(result, (0, 1, 3, 2)) # BS x N x M x 2H
+        result = tf.reshape(result, (-1, N * M, 2 * H)) # BS x (NxM) x 2H
+        tf.assert_equal(tf.shape(result), [BS, N*M, 2*H])
+
+        #Compute all dot products
+        # Reshape needed for broadcasting and matrix multiplication
+        w_sim_1 = tf.tile(tf.expand_dims(w_sim_1, 0), [BS, 1]) # BS x 2H
+        w_sim_2 = tf.tile(tf.expand_dims(w_sim_2, 0), [BS, 1]) # BS x 2H
+        w_sim_3 = tf.tile(tf.expand_dims(w_sim_3, 0), [BS, 1]) # BS x 2H
+
+        term1 = tf.matmul(tf.reshape(contexts, (BS, N, 2*H)), tf.expand_dims(w_sim_1, -1)) # BS x N
+        term2 = tf.matmul(questions, tf.expand_dims(w_sim_2, -1)) # BS x M
+        term3 = tf.matmul(result, tf.expand_dims(w_sim_3, -1)) # BS x NM
+        term3 = tf.reshape(term3, (BS, N, M)) # BS x N x M
+        S = tf.reshape(term1,(-1, N, 1)) + term3 + tf.reshape(term2, (-1, 1, M))
+        return S
 
     def build_graph(self, questions, questions_mask, contexts, contexts_mask):
         """
@@ -141,52 +185,29 @@ class BidirectionAttn(object):
             1s where there's real input, 0s where there's padding
 
         Outputs:
-          values_output: Tensor shape (batch_size, num_keys, 4 * hidden_size).
+          values_output: Tensor shape (batch_size, context_len, 4 * hidden_size).
             This is the attention output; the weighted sum of the values
             (using the attention distribution as weights) concatenated with a
             weighted sum of the keys.
         """
         with vs.variable_scope("BidirectionAttn"):
-            # Get similarity matrix
-            w_sim_1 = tf.get_variable('w_sim_1', size=(2 * self.hidden_size),
-                initializer=tf.constant_initializer(0)) # 2 * self.hidden_size
-            w_sim_2 = tf.get_variable('w_sim_2', size=(2 * self.hidden_size),
-            initializer=tf.constant_initializer(0)) # 2 * self.hidden_size
-            w_sim_3 = tf.get_variable('w_sim_3', size=(2 * self.hidden_size),
-                initializer=tf.constant_initializer(0)) # 2 * self.hidden_size
+            S = self.build_similarity_matrix(questions, contexts) # (bacth_size, context_len, question_len)
 
-            N = tf.shape(contexts)[1]
-            M = tf.shape(questions)[1]
-            H = self.hidden_size
-            q_tile = np.tile(questions, (N, 1, 1, 1)) #  N x BS x M x 2H
-            q_tile = np.transpose(q_tile, (1, 0, 3, 2)) # BS x N x 2H x M
-            c = np.reshape(contexts, (BS, N, 2*H, 1)) # BS x N x 2H x 1
+            # Context to Question Attention
+            # TODO: Need to build S_mask where S[:][i][j] is False if q_i or c_j is a padding
+            _, alpha = masked_softmax(S, S_mask, 2) # (batch_size, context_len, question_len)
+            c2q_output = tf.matmul(alpha, questions) # batch_size, context_len, 2*hidden_size)
 
-            result = (c * q_tile) # BS x N x 2H x M
-            # TODO : Assert shape
+            # Question to Context Attention
+            m = tf.reduce_max(S, axis= 2) # (batch_size, context_len)
+            beta = tf.nn.softmax(S) # (batch_size, context_len)
+            q2c_output = tf.matmul(beta, contexts) # (batch_size, 2 * h)
 
-            result = np.transpose(result, (0, 1, 3, 2)) # BS x N x M x 2H
-            result = np.reshape(result, (-1, N x M, 2 * H)) # BS x (NxM) x 2H
-
-            term1 = np.dot(c.reshape(-1, N, 2*H), w_1) # BS x N
-            term2 = np.dot(q, w_2) # BS x M
-            term3 = np.dot(result, w_3).reshape(N, M) # BS x N x M
-            S = term1.reshape(-1, N, 1) + term3
-            S = result + term2.reshape(-1, 1, M)
-
-            # Calculate attention distribution
-            values_t = tf.transpose(values, perm=[0, 2, 1]) # (batch_size, value_vec_size, num_values)
-            attn_logits = tf.matmul(keys, values_t) # shape (batch_size, num_keys, num_values)
-            attn_logits_mask = tf.expand_dims(values_mask, 1) # shape (batch_size, 1, num_values)
-            _, attn_dist = masked_softmax(attn_logits, attn_logits_mask, 2) # shape (batch_size, num_keys, num_values). take softmax over values
-
-            # Use attention distribution to take weighted sum of values
-            output = tf.matmul(attn_dist, values) # shape (batch_size, num_keys, value_vec_size)
-
+            # TODO: Decide whether to apply dropout
             # Apply dropout
-            output = tf.nn.dropout(output, self.keep_prob)
-
-            return attn_dist, output
+            # output = tf.nn.dropout(output, self.keep_prob)
+            output = tf.concat([c2q_output, q2c_output, axis=2]) #batch_size, context_len, 4*hidden_size
+            return output
 
 class BasicAttn(object):
     """Module for basic attention.

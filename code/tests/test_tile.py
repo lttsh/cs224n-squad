@@ -1,8 +1,8 @@
 import numpy as np
 
+H = 2
 N = 2
 M = 3
-H = 2
 
 c = np.array([[1, 2, 3, 4], [5, 6, 7, 8]]) # N x 2H
 q = np.array([[1, 2, 3, 0], [5, 6, 7, 4], [8, 9 , 10, 11]]) # M x 2H

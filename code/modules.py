@@ -157,9 +157,9 @@ class BidirectionAttn(object):
 
             N = tf.shape(contexts)[1]
             M = tf.shape(questions)[1]
+            H = self.hidden_size
             q_tile = np.tile(questions, (N, 1, 1, 1)) #  N x BS x M x 2H
             q_tile = np.transpose(q_tile, (1, 0, 3, 2)) # BS x N x 2H x M
-
             c = np.reshape(contexts, (BS, N, 2*H, 1)) # BS x N x 2H x 1
 
             result = (c * q_tile) # BS x N x 2H x M
@@ -173,7 +173,7 @@ class BidirectionAttn(object):
             term3 = np.dot(result, w_3).reshape(N, M) # BS x N x M
             S = term1.reshape(-1, N, 1) + term3
             S = result + term2.reshape(-1, 1, M)
-            
+
             # Calculate attention distribution
             values_t = tf.transpose(values, perm=[0, 2, 1]) # (batch_size, value_vec_size, num_values)
             attn_logits = tf.matmul(keys, values_t) # shape (batch_size, num_keys, num_values)

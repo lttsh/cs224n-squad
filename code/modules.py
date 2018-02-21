@@ -191,22 +191,36 @@ class BidirectionAttn(object):
             weighted sum of the keys.
         """
         with vs.variable_scope("BidirectionAttn"):
+            H = self.hidden_size
+            BS = tf.shape(questions)[0]
+            N = tf.shape(contexts)[1]
+
             S = self.build_similarity_matrix(questions, contexts) # (bacth_size, context_len, question_len)
 
             # Context to Question Attention
-            # TODO: Need to build S_mask where S[:][i][j] is False if q_i or c_j is a padding
+            # Build mask for similarity matrix
+            questions_mask = tf.expand_dims(questions_mask, -1) # BS x M x 1
+            contexts_mask = tf.expand_dims(contexts_mask, -1) # BS x N x 1
+            S_mask = tf.matmul(
+                contexts_mask,
+                tf.transpose(questions_mask, (0, 2, 1))
+            )
+
             _, alpha = masked_softmax(S, S_mask, 2) # (batch_size, context_len, question_len)
             c2q_output = tf.matmul(alpha, questions) # batch_size, context_len, 2*hidden_size)
 
             # Question to Context Attention
-            m = tf.reduce_max(S, axis= 2) # (batch_size, context_len)
-            beta = tf.nn.softmax(S) # (batch_size, context_len)
-            q2c_output = tf.matmul(beta, contexts) # (batch_size, 2 * h)
+            m = tf.reduce_max(S * tf.cast(S_mask, dtype=tf.float64), axis= 2) # (batch_size, context_len)
+            beta = tf.expand_dims(tf.nn.softmax(m), -1) # (batch_size, context_len, 1)
+            beta = tf.transpose(beta, (0, 2, 1))
+            q2c_output = tf.matmul(beta, contexts) # (batch_size, 1, 2 * h)
 
             # TODO: Decide whether to apply dropout
             # Apply dropout
             # output = tf.nn.dropout(output, self.keep_prob)
+            q2c_output= tf.tile(q2c_output, (1, N, 1))
             output = tf.concat([c2q_output, q2c_output, axis=2]) #batch_size, context_len, 4*hidden_size
+            tf.assert_equal(tf.shape(output), [BS, N, 4*H])
             return output
 
 class BasicAttn(object):

@@ -136,7 +136,7 @@ def main(unused_argv):
     dev_context_path = os.path.join(FLAGS.data_dir, "dev.context")
     dev_qn_path = os.path.join(FLAGS.data_dir, "dev.question")
     dev_ans_path = os.path.join(FLAGS.data_dir, "dev.span")
-
+    qa_model=None
     # Initialize model
     if FLAGS.model_name == "baseline":
         qa_model = QABaselineModel(FLAGS, id2word, word2id, emb_matrix)

@@ -8,5 +8,5 @@ data/
 *.pyc
 
 # Experiments 
-code/stats/
 experiments/
+*.json

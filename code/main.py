@@ -26,6 +26,8 @@ import logging
 import tensorflow as tf
 
 from qa_model import QAModel
+from qa_baseline_model import QABaselineModel
+from qa_bidaf_model import QABidafModel
 from vocab import get_glove
 from official_eval_helper import get_json_data, generate_answers
 
@@ -42,6 +44,9 @@ tf.app.flags.DEFINE_integer("gpu", 0, "Which GPU to use, if you have multiple.")
 tf.app.flags.DEFINE_string("mode", "train", "Available modes: train / show_examples / official_eval")
 tf.app.flags.DEFINE_string("experiment_name", "", "Unique name for your experiment. This will create a directory by this name in the experiments/ directory, which will hold all data related to this experiment")
 tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means train indefinitely")
+
+# Model options
+tf.app.flags.DEFINE_string("model_name", "baseline", "Define the model to be used.")
 
 # Hyperparameters
 tf.app.flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")
@@ -133,8 +138,11 @@ def main(unused_argv):
     dev_ans_path = os.path.join(FLAGS.data_dir, "dev.span")
 
     # Initialize model
-    qa_model = QAModel(FLAGS, id2word, word2id, emb_matrix)
-
+    if FLAGS.model_name == "baseline":
+        qa_model = QABaselineModel(FLAGS, id2word, word2id, emb_matrix)
+    elif FLAGS.model_name == "bidaf":
+        qa_model = QABidafModel(FLAGS, id2word, word2id, emb_matrix)
+        
     # Some GPU settings
     config=tf.ConfigProto()
     config.gpu_options.allow_growth = True

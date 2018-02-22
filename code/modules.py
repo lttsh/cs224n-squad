@@ -140,11 +140,11 @@ class BidirectionAttn(object):
         N = tf.shape(contexts)[1]
         M = tf.shape(questions)[1]
 
-        w_sim_1 = tf.get_variable('w_sim_1', shape=(2*H)
+        w_sim_1 = tf.get_variable('w_sim_1', shape=(2*H),
             initializer=tf.constant_initializer(0)) # 2 * H
-        w_sim_2 = tf.get_variable('w_sim_2', shape=(2*H)
+        w_sim_2 = tf.get_variable('w_sim_2', shape=(2*H),
             initializer=tf.constant_initializer(0)) # 2 * H
-        w_sim_3 = tf.get_variable('w_sim_3', shape =(2*H)
+        w_sim_3 = tf.get_variable('w_sim_3', shape =(2*H),
             initializer=tf.constant_initializer(0)) # 2 * H
 
         # Compute matrix  of size BS x N x M x 2H which contains all c_i o q_j
@@ -194,7 +194,7 @@ class BidirectionAttn(object):
             H = self.hidden_size
             BS = tf.shape(questions)[0]
             N = tf.shape(contexts)[1]
-
+            M = tf.shape(questions)[1]
             S = self.build_similarity_matrix(questions, contexts) # (bacth_size, context_len, question_len)
 
             # Context to Question Attention
@@ -206,21 +206,21 @@ class BidirectionAttn(object):
                 tf.transpose(questions_mask, (0, 2, 1))
             )
 
-            _, alpha = masked_softmax(S, S_mask, 2) # (batch_size, context_len, question_len)
+            S, alpha = masked_softmax(S, S_mask, 2) # (batch_size, context_len, question_len)
             c2q_output = tf.matmul(alpha, questions) # batch_size, context_len, 2*hidden_size)
+            tf.assert_equal(tf.shape(S), (BS, N, M))
 
             # Question to Context Attention
-            m = tf.reduce_max(S * tf.cast(S_mask, dtype=tf.float64), axis= 2) # (batch_size, context_len)
+            m = tf.reduce_max(S, axis= 2) # (batch_size, context_len)
             beta = tf.expand_dims(tf.nn.softmax(m), -1) # (batch_size, context_len, 1)
             beta = tf.transpose(beta, (0, 2, 1))
             q2c_output = tf.matmul(beta, contexts) # (batch_size, 1, 2 * h)
 
-            # TODO: Decide whether to apply dropout
-            # Apply dropout
-            # output = tf.nn.dropout(output, self.keep_prob)
             q2c_output= tf.tile(q2c_output, (1, N, 1))
-            output = tf.concat([c2q_output, q2c_output, axis=2]) #batch_size, context_len, 4*hidden_size
+            output = tf.concat([c2q_output, q2c_output], axis=2) #batch_size, context_len, 4*hidden_size
             tf.assert_equal(tf.shape(output), [BS, N, 4*H])
+            # Apply dropout
+            output = tf.nn.dropout(output, self.keep_prob)
             return output
 
 class BasicAttn(object):

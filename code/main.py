@@ -25,9 +25,7 @@ import logging
 
 import tensorflow as tf
 
-from qa_model import QAModel
-from qa_baseline_model import QABaselineModel
-from qa_bidaf_model import QABidafModel
+from models import QAModel, QABidafModel, QABaselineModel
 from vocab import get_glove
 from official_eval_helper import get_json_data, generate_answers
 
@@ -37,7 +35,6 @@ logging.basicConfig(level=logging.INFO)
 MAIN_DIR = os.path.relpath(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # relative path of the main directory
 DEFAULT_DATA_DIR = os.path.join(MAIN_DIR, "data") # relative path of data dir
 EXPERIMENTS_DIR = os.path.join(MAIN_DIR, "experiments") # relative path of experiments dir
-
 
 # High-level options
 tf.app.flags.DEFINE_integer("gpu", 0, "Which GPU to use, if you have multiple.")
@@ -142,7 +139,7 @@ def main(unused_argv):
         qa_model = QABaselineModel(FLAGS, id2word, word2id, emb_matrix)
     elif FLAGS.model_name == "bidaf":
         qa_model = QABidafModel(FLAGS, id2word, word2id, emb_matrix)
-        
+
     # Some GPU settings
     config=tf.ConfigProto()
     config.gpu_options.allow_growth = True

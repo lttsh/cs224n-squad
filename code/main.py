@@ -136,20 +136,22 @@ def main(unused_argv):
     dev_context_path = os.path.join(FLAGS.data_dir, "dev.context")
     dev_qn_path = os.path.join(FLAGS.data_dir, "dev.question")
     dev_ans_path = os.path.join(FLAGS.data_dir, "dev.span")
+    small_context_path = os.path.join(FLAGS.data_dir, "small.context")
+    small_qn_path = os.path.join(FLAGS.data_dir, "small.question")
+    small_ans_path = os.path.join(FLAGS.data_dir, "small.span")
     qa_model=None
     # Initialize model
     if FLAGS.model_name == "baseline":
         qa_model = QABaselineModel(FLAGS, id2word, word2id, emb_matrix)
     elif FLAGS.model_name == "bidaf":
         qa_model = QABidafModel(FLAGS, id2word, word2id, emb_matrix)
-        
+
     # Some GPU settings
     config=tf.ConfigProto()
     config.gpu_options.allow_growth = True
 
     # Split by mode
     if FLAGS.mode == "train":
-
         # Setup train dir and logfile
         if not os.path.exists(FLAGS.train_dir):
             os.makedirs(FLAGS.train_dir)
@@ -172,6 +174,28 @@ def main(unused_argv):
             # Train
             qa_model.train(sess, train_context_path, train_qn_path, train_ans_path, dev_qn_path, dev_context_path, dev_ans_path)
 
+    elif FLAGS.mode == "test":
+        # Setup train dir and logfile
+        if not os.path.exists(FLAGS.train_dir):
+            os.makedirs(FLAGS.train_dir)
+        file_handler = logging.FileHandler(os.path.join(FLAGS.train_dir, "log.txt"))
+        logging.getLogger().addHandler(file_handler)
+
+        # Save a record of flags as a .json file in train_dir
+        with open(os.path.join(FLAGS.train_dir, "flags.json"), 'w') as fout:
+            json.dump(FLAGS.__flags, fout)
+
+        # Make bestmodel dir if necessary
+        if not os.path.exists(bestmodel_dir):
+            os.makedirs(bestmodel_dir)
+
+        with tf.Session(config=config) as sess:
+
+            # Load most recent model
+            initialize_model(sess, qa_model, FLAGS.train_dir, expect_exists=False)
+
+            # Train
+            qa_model.train(sess, small_context_path, small_qn_path, small_ans_path, dev_qn_path, dev_context_path, dev_ans_path)
 
     elif FLAGS.mode == "show_examples":
         with tf.Session(config=config) as sess:

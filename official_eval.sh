@@ -1,7 +1,7 @@
 model=$1
 experiment=$2
 
-python code/main.py --mode=official_eval --json_in_path=data/tiny-dev.json \
+python code/main.py --dropout=0 --mode=official_eval --json_in_path=data/tiny-dev.json \
 --ckpt_load_dir=experiments/$experiment/best_checkpoint --model=$model
 
  echo "Evaluating on tiny dev set.\n"

@@ -139,8 +139,10 @@ def main(unused_argv):
     qa_model=None
     # Initialize model
     if FLAGS.model_name == "baseline":
+        print("Using baseline model")
         qa_model = QABaselineModel(FLAGS, id2word, word2id, emb_matrix)
     elif FLAGS.model_name == "bidaf":
+        print("Using BIDAF model")
         qa_model = QABidafModel(FLAGS, id2word, word2id, emb_matrix)
 
     # Some GPU settings

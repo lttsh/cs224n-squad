@@ -46,14 +46,17 @@ class RNNEncoder(object):
         self.keep_prob = keep_prob
         self.num_layers=num_layers
         self.mode = mode
+        self.rnn_cell_fw = DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
+        self.rnn_cell_bw = DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
+        print("RNN Encoder")
 
     def get_rnn_cell(self, hidden_size, keep_prob):
-        rnn_cell = None
+        my_rnn_cell = None
         if self.mode == 'GRU':
-            rnn_cell = rnn_cell.GRUCell(self.hidden_size)
+            my_rnn_cell = rnn_cell.GRUCell(self.hidden_size)
         elif self.mode == 'LSTM':
-            rnn_cell = tf.contrib.rnn.BaiscLSTMCell(self.hidden_size)
-        return DropoutWrapper(rnn_cell, input_keep_prob=self.keep_prob)
+            my_rnn_cell = tf.contrib.rnn.BaiscLSTMCell(self.hidden_size)
+        return DropoutWrapper(my_rnn_cell, input_keep_prob=self.keep_prob)
 
     def build_graph(self, inputs, masks):
         """
@@ -71,7 +74,14 @@ class RNNEncoder(object):
             input_lens = tf.reduce_sum(masks, reduction_indices=1) # shape (batch_size)
             # Note: fw_out and bw_out are the hidden states for every timestep.
             # Each is shape (batch_size, seq_len, hidden_size).
-            (fw_out, bw_out), _ = tf.nn.stack_bidirectional_rnn(
+            if self.num_layers==1:
+              (fw_out, bw_out), _ = tf.nn.bidirectional_dynamic_rnn(
+                self.rnn_cell_fw, self.rnn_cell_bw,
+                inputs,
+                input_lens,
+                dtype=tf.float32)
+            else:
+              (fw_out, bw_out), _ = tf.contrib.rnn.stack_bidirectional_rnn(
                 [self.get_rnn_cell(self.hidden_size, self.keep_prob) for _ in range(self.num_layers)],
                 [self.get_rnn_cell(self.hidden_size, self.keep_prob) for _ in range(self.num_layers)],
                 inputs,
@@ -136,6 +146,7 @@ class BidirectionAttn(object):
         """
         self.keep_prob = keep_prob
         self.hidden_size = hidden_size
+        print("Building BIDAF")
     def build_similarity_matrix(self, questions, contexts):
         """
         Inputs:
@@ -162,8 +173,8 @@ class BidirectionAttn(object):
         q_tile = tf.transpose(q_tile, (1, 0, 3, 2)) # BS x N x 2H x M
 
         contexts = tf.expand_dims(contexts, -1) # BS x N x 2H x 1
-        c_tile = tf.tile(contexts, [1, 1, 1, M]) # BS x N x 2H x M
-        result = (c_tile * q_tile) # BS x N x 2H x M
+        # c_tile = tf.tile(contexts, [1, 1, 1, M]) # BS x N x 2H x M
+        result = (contexts * q_tile) # BS x N x 2H x M
         tf.assert_equal(tf.shape(result), [BS, N, 2 * H, M])
         result = tf.transpose(result, (0, 1, 3, 2)) # BS x N x M x 2H
         result = tf.reshape(result, (-1, N * M, 2 * H)) # BS x (NxM) x 2H
@@ -180,6 +191,7 @@ class BidirectionAttn(object):
         term3 = tf.matmul(result, tf.expand_dims(w_sim_3, -1)) # BS x NM
         term3 = tf.reshape(term3, (BS, N, M)) # BS x N x M
         S = tf.reshape(term1,(-1, N, 1)) + term3 + tf.reshape(term2, (-1, 1, M))
+        print("Building Similarity Matrix")
         return S
 
     def build_graph(self, questions, questions_mask, contexts, contexts_mask):
@@ -225,13 +237,15 @@ class BidirectionAttn(object):
 
             # Question to Context Attention
             m = tf.reduce_max(S, axis=2) # (batch_size, context_len)
-            beta = tf.expand_dims(tf.nn.softmax(m, axis=1), -1) # (batch_size, context_len, 1)
+            beta = tf.expand_dims(tf.nn.softmax(m), -1) # (batch_size, context_len, 1)
             beta = tf.transpose(beta, (0, 2, 1))
             q2c_output = tf.matmul(beta, contexts) # (batch_size, 1, 2 * h)
 
             q2c_output= tf.tile(q2c_output, (1, N, 1))
             output = tf.concat([c2q_output, c2q_output * contexts, q2c_output * contexts], axis=2) #batch_size, context_len, 6*hidden_size
             tf.assert_equal(tf.shape(output), [BS, N, 6*H])
+            print("Bidirectional")
+            # output = tf.Print(output, [output])
             # Apply dropout
             output = tf.nn.dropout(output, self.keep_prob)
             return output
@@ -257,6 +271,7 @@ class BasicAttn(object):
           key_vec_size: size of the key vectors. int
           value_vec_size: size of the value vectors. int
         """
+        print("Building Basic Attention")
         self.keep_prob = keep_prob
         self.key_vec_size = key_vec_size
         self.value_vec_size = value_vec_size
@@ -280,6 +295,7 @@ class BasicAttn(object):
             This is the attention output; the weighted sum of the values
             (using the attention distribution as weights).
         """
+        print("Graph for BasicAttn")
         with vs.variable_scope("BasicAttn"):
 
             # Calculate attention distribution

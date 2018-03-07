@@ -25,7 +25,9 @@ import logging
 
 import tensorflow as tf
 
-from models import QAModel, QABidafModel, QABaselineModel
+from qa_model import QAModel
+from qa_bidaf_model import QABidafModel
+from qa_baseline_model import QABaselineModel
 from vocab import get_glove
 from official_eval_helper import get_json_data, generate_answers
 

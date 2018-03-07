@@ -48,6 +48,8 @@ tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means
 tf.app.flags.DEFINE_string("model_name", "baseline", "Define the model to be used.")
 tf.app.flags.DEFINE_string("rnn_cell", "GRU", "Choose RNN cell GRU/LSTM")
 tf.app.flags.DEFINE_integer("num_layers", 1, "Choose num of layers for embedding")
+tf.app.flags.DEFINE_string("select_mode", "default", "Choose start/end position selection heuristic. default/endafter")
+
 # Hyperparameters
 tf.app.flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")
 tf.app.flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")

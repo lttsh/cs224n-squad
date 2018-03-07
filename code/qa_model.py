@@ -414,10 +414,12 @@ class QAModel(object):
         # Checkpoint management.
         # We keep one latest checkpoint, and one best checkpoint (early stopping)
         checkpoint_path = os.path.join(self.FLAGS.train_dir, "qa.ckpt")
-        bestmodel_dir = os.path.join(self.FLAGS.train_dir, "best_checkpoint")
-        bestmodel_f1_ckpt_path = os.path.join(bestmodel_dir, "qa_best_f1.ckpt")
-        bestmodel_loss_ckpt_path = os.path.join(bestmodel_dir, "qa_best_loss.ckpt")
-        bestmodel_em_ckpt_path = os.path.join(bestmodel_dir, "qa_best_em.ckpt")
+        bestmodel_f1_dir = os.path.join(self.FLAGS.train_dir, "best_f1_checkpoint")
+        bestmodel_em_dir = os.path.join(self.FLAGS.train_dir, "best_em_checkpoint")
+        bestmodel_loss_dir = os.path.join(self.FLAGS.train_dir, "best_loss_checkpoint")
+        bestmodel_f1_ckpt_path = os.path.join(bestmodel_f1_dir, "qa_best_f1.ckpt")
+        bestmodel_loss_ckpt_path = os.path.join(bestmodel_loss_dir, "qa_best_loss.ckpt")
+        bestmodel_em_ckpt_path = os.path.join(bestmodel_em_dir, "qa_best_em.ckpt")
         best_dev_f1 = None
         best_dev_em = None
         best_dev_loss = None
@@ -492,8 +494,8 @@ class QAModel(object):
                         self.bestmodel_saver.save(session, bestmodel_em_ckpt_path, global_step=global_step)
                     if best_dev_f1 is None or dev_f1 > best_dev_f1:
                         best_dev_f1 = dev_f1
-                        logging.info("Saving to %s..." % bestmodel_loss_ckpt_path)
-                        self.bestmodel_saver.save(session, bestmodel_loss_ckpt_path, global_step=global_step)
+                        logging.info("Saving to %s..." % bestmodel_f1_ckpt_path)
+                        self.bestmodel_saver.save(session, bestmodel_f1_ckpt_path, global_step=global_step)
 
 
             epoch_toc = time.time()

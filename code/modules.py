@@ -244,8 +244,12 @@ class BidirectionAttn(object):
             q2c_output= tf.tile(q2c_output, (1, N, 1))
             output = tf.concat([c2q_output, c2q_output * contexts, q2c_output * contexts], axis=2) #batch_size, context_len, 6*hidden_size
             tf.assert_equal(tf.shape(output), [BS, N, 6*H])
+<<<<<<< Updated upstream:code/modules.py
             print("Bidirectional")
             # output = tf.Print(output, [output])
+=======
+            tf.Print(output, [output])
+>>>>>>> Stashed changes:code/models/modules.py
             # Apply dropout
             output = tf.nn.dropout(output, self.keep_prob)
             return output

@@ -46,23 +46,19 @@ class RNNEncoder(object):
         self.keep_prob = keep_prob
         self.num_layers=num_layers
         self.mode = mode
-        if self.mode == 'GRU':
-            print("Using GRUs")
-            self.rnn_cell_fw = DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
-            self.rnn_cell_bw = DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
-        elif self.mode == 'LSTM':
-            print("Using LSTMs")
-            self.rnn_cell_fw = DropoutWrapper(tf.contrib.rnn.BasicLSTMCell(self.hidden_size), input_keep_prob=self.keep_prob)
-            self.rnn_cell_bw = DropoutWrapper(tf.contrib.rnn.BasicLSTMCell(self.hidden_size), input_keep_prob=self.keep_prob)
+        self.rnn_cells_fw = []
+        self.rnn_cells_bw = []
+        for _ in range(num_layers):
+            if self.mode == 'GRU':
+                print("Using GRUs")
+                self.rnn_cells_fw.append(DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob))
+                self.rnn_cells_bw.append(DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob))
+            elif self.mode == 'LSTM':
+                print("Using LSTMs")
+                self.rnn_cells_fw.append(DropoutWrapper(tf.contrib.rnn.BasicLSTMCell(self.hidden_size), input_keep_prob=self.keep_prob))
+                self.rnn_cells_bw.append(DropoutWrapper(tf.contrib.rnn.BasicLSTMCell(self.hidden_size), input_keep_prob=self.keep_prob))
         print("RNN Encoder")
 
-    def get_rnn_cell(self, hidden_size, keep_prob):
-        my_rnn_cell = None
-        if self.mode == 'GRU':
-            my_rnn_cell = rnn_cell.GRUCell(self.hidden_size)
-        elif self.mode == 'LSTM':
-            my_rnn_cell = tf.contrib.rnn.BaiscLSTMCell(self.hidden_size)
-        return DropoutWrapper(my_rnn_cell, input_keep_prob=self.keep_prob)
 
     def build_graph(self, inputs, masks):
         """
@@ -77,27 +73,34 @@ class RNNEncoder(object):
             This is all hidden states (fw and bw hidden states are concatenated).
         """
         with vs.variable_scope("RNNEncoder"):
+            def get_rnn_cell(hidden_size, keep_prob):
+                if self.mode == 'GRU':
+                    return DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
+                elif self.mode == 'LSTM':
+                    print("Got LSTM cell")
+                    return DropoutWrapper(tf.contrib.rnn.BasicLSTMCell(self.hidden_size), input_keep_prob=self.keep_prob)
             input_lens = tf.reduce_sum(masks, reduction_indices=1) # shape (batch_size)
             # Note: fw_out and bw_out are the hidden states for every timestep.
-            # Each is shape (batch_size, seq_len, hidden_size).
+            # # Each is shape (batch_size, seq_len, hidden_size).
             if self.num_layers==1:
-              (fw_out, bw_out), _ = tf.nn.bidirectional_dynamic_rnn(
-                self.rnn_cell_fw, self.rnn_cell_bw,
-                inputs,
-                input_lens,
-                dtype=tf.float32)
+                (fw_out, bw_out), _ = tf.nn.bidirectional_dynamic_rnn(
+                    self.rnn_cells_fw[0], self.rnn_cells_bw[0],
+                    inputs,
+                    input_lens,
+                    dtype=tf.float32)
+                # Concatenate the forward and backward hidden states
+                out = tf.concat([fw_out, bw_out], 2)
             else:
-              (fw_out, bw_out), _ = tf.contrib.rnn.stack_bidirectional_rnn(
-                [self.get_rnn_cell(self.hidden_size, self.keep_prob) for _ in range(self.num_layers)],
-                [self.get_rnn_cell(self.hidden_size, self.keep_prob) for _ in range(self.num_layers)],
-                inputs,
-                sequence_length=input_lens,
-                dtype=tf.float32)
-
-            # Concatenate the forward and backward hidden states
-            out = tf.concat([fw_out, bw_out], 2)
-
-            # Apply dropout
+                inputs_list = tf.unstack(inputs, axis=1)
+                tf.assert_equal(len(inputs_list),tf.shape(inputs)[1])
+                out, _, _ = tf.contrib.rnn.stack_bidirectional_rnn(
+                  self.rnn_cells_fw,
+                  self.rnn_cells_bw,
+                  inputs_list,
+                  sequence_length=input_lens,
+                  dtype=tf.float32)
+                out = tf.stack(out, axis=1)
+                tf.assert_equal(tf.shape(out), [tf.shape(inputs)[0], tf.shape(inputs)[1], 2 * self.hidden_size])
             out = tf.nn.dropout(out, self.keep_prob)
 
             return out

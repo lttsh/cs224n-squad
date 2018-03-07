@@ -162,7 +162,8 @@ class BidirectionAttn(object):
         q_tile = tf.transpose(q_tile, (1, 0, 3, 2)) # BS x N x 2H x M
 
         contexts = tf.expand_dims(contexts, -1) # BS x N x 2H x 1
-        result = (contexts * q_tile) # BS x N x 2H x M
+        c_tile = tf.tile(contexts, [1, 1, 1, M]) # BS x N x 2H x M
+        result = (c_tile * q_tile) # BS x N x 2H x M
         tf.assert_equal(tf.shape(result), [BS, N, 2 * H, M])
         result = tf.transpose(result, (0, 1, 3, 2)) # BS x N x M x 2H
         result = tf.reshape(result, (-1, N * M, 2 * H)) # BS x (NxM) x 2H
@@ -217,12 +218,14 @@ class BidirectionAttn(object):
             )
 
             S, alpha = masked_softmax(S, S_mask, 2) # (batch_size, context_len, question_len)
-            c2q_output = tf.matmul(alpha, questions) # batch_size, context_len, 2*hidden_size)
             tf.assert_equal(tf.shape(S), (BS, N, M))
+            sum_alpha = tf.reduce_sum(alpha, axis=2) # batch_size, context_len
+            tf.assert_equal(sum_alpha, tf.ones(shape=[BS, N]))
+            c2q_output = tf.matmul(alpha, questions) # batch_size, context_len, 2*hidden_size)
 
             # Question to Context Attention
-            m = tf.reduce_max(S, axis= 2) # (batch_size, context_len)
-            beta = tf.expand_dims(tf.nn.softmax(m), -1) # (batch_size, context_len, 1)
+            m = tf.reduce_max(S, axis=2) # (batch_size, context_len)
+            beta = tf.expand_dims(tf.nn.softmax(m, axis=1), -1) # (batch_size, context_len, 1)
             beta = tf.transpose(beta, (0, 2, 1))
             q2c_output = tf.matmul(beta, contexts) # (batch_size, 1, 2 * h)
 

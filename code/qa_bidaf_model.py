@@ -65,7 +65,7 @@ class QABidafModel(QAModel):
         # Use a RNN to get hidden states for the context and the question
         # Note: here the RNNEncoder is shared (i.e. the weights are the same)
         # between the context and the question.
-        encoder = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
+        encoder = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob, mode=self.FLAGS.rnn_cell)
         context_hiddens = encoder.build_graph(self.context_embs, self.context_mask) # (batch_size, context_len, hidden_size*2)
         question_hiddens = encoder.build_graph(self.qn_embs, self.qn_mask) # (batch_size, question_len, hidden_size*2)
 
@@ -75,7 +75,7 @@ class QABidafModel(QAModel):
 
         # Concat attn_output to context_hiddens to get blended_reps
         blended_reps = tf.concat([context_hiddens, attn_output], axis=2) # (batch_size, context_len, hidden_size*8)
-        
+
         # Apply fully connected layer to each blended representation
         # Note, blended_reps_final corresponds to b' in the handout
         # Note, tf.contrib.layers.fully_connected applies a ReLU non-linarity here by default

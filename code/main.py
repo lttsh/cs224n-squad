@@ -46,6 +46,7 @@ tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means
 
 # Model options
 tf.app.flags.DEFINE_string("model_name", "baseline", "Define the model to be used.")
+tf.app.flags.DEFINE_string("rnn_cell", "GRU", "Choose RNN cell GRU/LSTM")
 
 # Hyperparameters
 tf.app.flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")

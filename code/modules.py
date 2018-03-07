@@ -46,8 +46,14 @@ class RNNEncoder(object):
         self.keep_prob = keep_prob
         self.num_layers=num_layers
         self.mode = mode
-        self.rnn_cell_fw = DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
-        self.rnn_cell_bw = DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
+        if self.mode == 'GRU':
+            print("Using GRUs")
+            self.rnn_cell_fw = DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
+            self.rnn_cell_bw = DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
+        elif self.mode == 'LSTM':
+            print("Using LSTMs")
+            self.rnn_cell_fw = DropoutWrapper(tf.contrib.rnn.BasicLSTMCell(self.hidden_size), input_keep_prob=self.keep_prob)
+            self.rnn_cell_bw = DropoutWrapper(tf.contrib.rnn.BasicLSTMCell(self.hidden_size), input_keep_prob=self.keep_prob)
         print("RNN Encoder")
 
     def get_rnn_cell(self, hidden_size, keep_prob):

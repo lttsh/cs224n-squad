@@ -143,6 +143,65 @@ class SimpleSoftmaxLayer(object):
 
             return masked_logits, prob_dist
 
+class SelfAttn(object):
+    """Module for self attention.
+    """
+
+    def __init__(self, keep_prob, hidden_size, attention_size):
+        """
+        Inputs:
+          keep_prob: tensor containing a single scalar that is the keep probability (for dropout)
+          key_vec_size: size of the key vectors. int
+          value_vec_size: size of the value vectors. int
+        """
+        print("Building Self Attention Layer")
+        self.keep_prob = keep_prob
+        self.hidden_size = hidden_size
+        self.attention_size = attention_size
+
+    def build_graph(self, contexts, contexts_mask):
+        """
+        Inputs:
+          contexts: Tensor shape (B, N, 2H).
+          contexts_mask: Tensor shape (BS, N).
+            1s where there's real input, 0s where there's padding
+
+        Outputs:
+          output: Tensor shape (batch_size, N, 4H).
+            This is the attention output; the concatenated hidden state with the self Attention
+        """
+        print("Graph for BasicAttn")
+        with vs.variable_scope("BasicAttn"):
+            N = tf.shape(contexts)[1]
+            self.weights_1 = tf.get_variable(
+                "W1",
+                shape=(2 * self.hidden_size, self.attention_size),
+                initializer=tf.contrib.layers.xavier_initializer())
+            self.weights_2 = tf.get_variable(
+                "W2",
+                shape=(2 * self.hidden_size, self.attention_size),
+                initializer=tf.contrib.layers.xavier_initializer())
+            self.v = tf.get_variable(
+                "v",
+                shape=(self.attention_size),
+                initializer=tf.contrib.layers.xavier_initializer())
+            values_1 = tf.matmul(contexts, self.weights_1) # BS x N x C
+            values_2 = tf.matmul(contexts, self.weights_2) # BS x N x C
+            values_1 = tf.expand_dims(values_1, axis=1) # BS x 1 x N x C
+            values_2 = tf.expand_dims(values_2, axis=2) # BS x N x 1 x C
+            additive_value = values_1 + values_2 # BS x N x N x C
+            additive_value = tf.tanh(additive_value)
+            E = tf.matmul(additive_value, self.v) # BS x N x N x 1
+            E = tf.reshape(E, (-1, N, N))
+            contexts_mask = tf.expand_dims(contexts_mask, 2) # BS x N x 1
+            E_mask = contexts_mask * tf.transpose(contexts_mask, [0, 2, 1]) # BS x N x N
+            E_masked, attn_p = masked_softmax(E, E_mask, 2) # BS x N x N
+            output = tf.matmul(attn_p, contexts) # BS x N x 2H
+            # Apply dropout
+            output = tf.nn.dropout(output, self.keep_prob)
+
+            return output
+
 class BidirectionAttn(object):
     """Module for bidirectional Attention.
     """

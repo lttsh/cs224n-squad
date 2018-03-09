@@ -36,7 +36,7 @@ class RNNEncoder(object):
     This code uses a bidirectional GRU, but you could experiment with other types of RNN.
     """
 
-    def __init__(self, hidden_size, keep_prob, num_layers=1, mode="GRU"):
+    def __init__(self, hidden_size, keep_prob, num_layers=1, mode="GRU", name=None):
         """
         Inputs:
           hidden_size: int. Hidden size of the RNN
@@ -46,6 +46,7 @@ class RNNEncoder(object):
         self.keep_prob = keep_prob
         self.num_layers=num_layers
         self.mode = mode
+        self.name=name
         self.rnn_cells_fw = []
         self.rnn_cells_bw = []
         for _ in range(num_layers):
@@ -72,7 +73,10 @@ class RNNEncoder(object):
           out: Tensor shape (batch_size, seq_len, hidden_size*2).
             This is all hidden states (fw and bw hidden states are concatenated).
         """
-        with vs.variable_scope("RNNEncoder"):
+        scope = self.name
+        if scope is None:
+            scope = "RNNEncoder"
+        with vs.variable_scope(scope):
             def get_rnn_cell(hidden_size, keep_prob):
                 if self.mode == 'GRU':
                     return DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
@@ -151,8 +155,8 @@ class SelfAttn(object):
         """
         Inputs:
           keep_prob: tensor containing a single scalar that is the keep probability (for dropout)
-          key_vec_size: size of the key vectors. int
-          value_vec_size: size of the value vectors. int
+          hidden_size: hidden size of the hidden representation. int
+          attention_size: size of the attention vector
         """
         print("Building Self Attention Layer")
         self.keep_prob = keep_prob
@@ -162,17 +166,19 @@ class SelfAttn(object):
     def build_graph(self, contexts, contexts_mask):
         """
         Inputs:
-          contexts: Tensor shape (B, N, 2H).
+          contexts: Tensor shape (BS, N, 2H).
           contexts_mask: Tensor shape (BS, N).
             1s where there's real input, 0s where there's padding
 
         Outputs:
-          output: Tensor shape (batch_size, N, 4H).
-            This is the attention output; the concatenated hidden state with the self Attention
+          output: Tensor shape (batch_size, N, 2H).
+            This is the attention output
         """
-        print("Graph for BasicAttn")
-        with vs.variable_scope("BasicAttn"):
+        print("Graph for Self Attn")
+        with vs.variable_scope("SelfAttn"):
+            B = tf.shape(contexts)[0]
             N = tf.shape(contexts)[1]
+            C = self.attention_size
             self.weights_1 = tf.get_variable(
                 "W1",
                 shape=(2 * self.hidden_size, self.attention_size),
@@ -183,20 +189,28 @@ class SelfAttn(object):
                 initializer=tf.contrib.layers.xavier_initializer())
             self.v = tf.get_variable(
                 "v",
-                shape=(self.attention_size),
+                shape=(self.attention_size, 1),
                 initializer=tf.contrib.layers.xavier_initializer())
-            values_1 = tf.matmul(contexts, self.weights_1) # BS x N x C
-            values_2 = tf.matmul(contexts, self.weights_2) # BS x N x C
+            values_1 = tf.matmul(contexts, tf.tile(tf.expand_dims(self.weights_1, 0), (B, 1,1))) # BS x N x C
+            values_2 = tf.matmul(contexts, tf.tile(tf.expand_dims(self.weights_2, 0), (B, 1,1))) # BS x N x C
+            tf.assert_equal(tf.shape(values_1), [B, N, C])
+            tf.assert_equal(tf.shape(values_2), [B, N, C])
             values_1 = tf.expand_dims(values_1, axis=1) # BS x 1 x N x C
             values_2 = tf.expand_dims(values_2, axis=2) # BS x N x 1 x C
             additive_value = values_1 + values_2 # BS x N x N x C
             additive_value = tf.tanh(additive_value)
-            E = tf.matmul(additive_value, self.v) # BS x N x N x 1
-            E = tf.reshape(E, (-1, N, N))
+            tf.assert_equal(tf.shape(additive_value), [B, N, N, C])
+            v = tf.expand_dims(self.v, 0) # 1 x C
+            v = tf.tile(v, [B * N * N, 1, 1]) # BS*N*N x C x 1
+            v = tf.reshape(v, (-1, N, N, C, 1)) # BS x N x N x C x 1
+            E = tf.matmul(tf.expand_dims(additive_value, 3), v) # BS x N x N x 1
+            E = tf.reshape(E, (-1, N, N)) # BS x N x N
+            tf.assert_equal(tf.shape(E), [B, N, N])
             contexts_mask = tf.expand_dims(contexts_mask, 2) # BS x N x 1
             E_mask = contexts_mask * tf.transpose(contexts_mask, [0, 2, 1]) # BS x N x N
-            E_masked, attn_p = masked_softmax(E, E_mask, 2) # BS x N x N
+            _, attn_p = masked_softmax(E, E_mask, 2) # BS x N x N
             output = tf.matmul(attn_p, contexts) # BS x N x 2H
+            tf.assert_equal(tf.shape(output), tf.shape(contexts))
             # Apply dropout
             output = tf.nn.dropout(output, self.keep_prob)
 

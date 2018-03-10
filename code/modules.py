@@ -191,8 +191,9 @@ class SelfAttn(object):
                 "v",
                 shape=(self.attention_size, 1),
                 initializer=tf.contrib.layers.xavier_initializer())
-            values_1 = tf.matmul(contexts, tf.tile(tf.expand_dims(self.weights_1, 0), (B, 1, 1))) # BS x N x C
-            values_2 = tf.matmul(contexts, tf.tile(tf.expand_dims(self.weights_2, 0), (B, 1, 1))) # BS x N x C
+
+            values_1 = tf.reshape(tf.matmul(tf.reshape(contexts, (B * N, -1)), self.weights_1), (-1, N, C)) # BS x N x C
+            values_2 = tf.reshape(tf.matmul(tf.reshape(contexts, (B * N, -1)), self.weights_2), (-1, N, C)) # BS x N x C
             tf.assert_equal(tf.shape(values_1), [B, N, C])
             tf.assert_equal(tf.shape(values_2), [B, N, C])
             values_1 = tf.expand_dims(values_1, axis=1) # BS x 1 x N x C
@@ -200,10 +201,7 @@ class SelfAttn(object):
             additive_value = values_1 + values_2 # BS x N x N x C
             additive_value = tf.tanh(additive_value)
             tf.assert_equal(tf.shape(additive_value), [B, N, N, C])
-            v = tf.expand_dims(self.v, 0) # 1 x C
-            v = tf.tile(v, [B * N * N, 1, 1]) # BS*N*N x C x 1
-            v = tf.reshape(v, (-1, N, N, C, 1)) # BS x N x N x C x 1
-            E = tf.matmul(tf.expand_dims(additive_value, 3), v) # BS x N x N x 1
+            E = tf.matmul(tf.reshape(additive_value, (B * N * N, C)), self.v) # BS x N x N x 1
             E = tf.reshape(E, (-1, N, N)) # BS x N x N
             tf.assert_equal(tf.shape(E), [B, N, N])
             contexts_mask = tf.expand_dims(contexts_mask, 2) # BS x N x 1

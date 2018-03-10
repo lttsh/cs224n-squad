@@ -191,8 +191,8 @@ class SelfAttn(object):
                 "v",
                 shape=(self.attention_size, 1),
                 initializer=tf.contrib.layers.xavier_initializer())
-            values_1 = tf.matmul(contexts, tf.tile(tf.expand_dims(self.weights_1, 0), (B, 1,1))) # BS x N x C
-            values_2 = tf.matmul(contexts, tf.tile(tf.expand_dims(self.weights_2, 0), (B, 1,1))) # BS x N x C
+            values_1 = tf.matmul(contexts, tf.tile(tf.expand_dims(self.weights_1, 0), (B, 1, 1))) # BS x N x C
+            values_2 = tf.matmul(contexts, tf.tile(tf.expand_dims(self.weights_2, 0), (B, 1, 1))) # BS x N x C
             tf.assert_equal(tf.shape(values_1), [B, N, C])
             tf.assert_equal(tf.shape(values_2), [B, N, C])
             values_1 = tf.expand_dims(values_1, axis=1) # BS x 1 x N x C

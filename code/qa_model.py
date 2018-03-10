@@ -394,6 +394,48 @@ class QAModel(object):
 
         return f1_total, em_total
 
+    def visualise_spans(self, session, context_path, qn_path, ans_path, dataset, num_samples=100):
+        """
+        Sample from the provided (train/dev) set.
+        For each sample, print begin and end span probabilities
+        Inputs:
+          session: TensorFlow session
+          qn_path, context_path, ans_path: paths to {dev/train}.{question/context/answer} data files.
+          dataset: string. Either "train" or "dev". Just for logging purposes.
+          num_samples: int. How many samples to use. If num_samples=0 then do whole dataset.
+        Returns:
+          begin_prob, end_prob: The average probabilities the sampled examples.
+        """
+        example_num = 0
+        total_start_dists = []
+        total_end_dists = []
+        tic = time.time()
+
+        # Note here we select discard_long=False because we want to sample from the entire dataset
+        # That means we're truncating, rather than discarding, examples with too-long context or questions
+        for batch in get_batch_generator(self.word2id, context_path, qn_path, ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=False):
+
+            pred_start_dists, pred_end_dists = self.get_prob_dists(session, batch)
+
+            # Convert the start and end positions to lists length batch_size
+            pred_start_dists = pred_start_dists.tolist() # list length batch_size
+            pred_end_dists = pred_end_dists.tolist() # list length batch_size
+
+            for (pred_start_dist, pred_end_dist) in zip(pred_start_dists, pred_end_dists):
+                example_num += 1
+
+                total_start_dists.append(pred_start_dist)
+                total_end_dists.append(end_start_dist)
+                print('Processed example %d' % example_num)
+
+                if num_samples != 0 and example_num >= num_samples:
+                    break
+
+            if num_samples != 0 and example_num >= num_samples:
+                break
+
+        toc = time.time()
+        return np.asarray(total_start_dists), np.asarray(total_end_dists)
 
     def train(self, session, train_context_path, train_qn_path, train_ans_path, dev_qn_path, dev_context_path, dev_ans_path):
         """

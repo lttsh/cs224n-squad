@@ -28,6 +28,7 @@ import tensorflow as tf
 from qa_model import QAModel
 from qa_bidaf_model import QABidafModel
 from qa_baseline_model import QABaselineModel
+from qa_selfattn_model import QASelfAttnModel
 from vocab import get_glove
 from official_eval_helper import get_json_data, generate_answers
 
@@ -45,9 +46,10 @@ tf.app.flags.DEFINE_string("experiment_name", "", "Unique name for your experime
 tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means train indefinitely")
 
 # Model options
-tf.app.flags.DEFINE_string("model_name", "bidaf", "Define the model to be used.")
+tf.app.flags.DEFINE_string("model_name", "bidaf", "Define the model to be used: baseline/bidaf/selfattn")
 tf.app.flags.DEFINE_string("rnn_cell", "GRU", "Choose RNN cell GRU/LSTM")
 tf.app.flags.DEFINE_integer("num_layers", 1, "Choose num of layers for embedding")
+tf.app.flags.DEFINE_integer("selfattn_size", 100, "Choose size of self attention vectors.")
 tf.app.flags.DEFINE_string("select_mode", "default", "Choose start/end position selection heuristic. default/endafter")
 
 # Hyperparameters
@@ -147,8 +149,11 @@ def main(unused_argv):
         print("Using baseline model")
         qa_model = QABaselineModel(FLAGS, id2word, word2id, emb_matrix)
     elif FLAGS.model_name == "bidaf":
-        print("Using BIDAF model")
         qa_model = QABidafModel(FLAGS, id2word, word2id, emb_matrix)
+        print("Using BIDAF model")
+    elif FLAGS.model_name == "selfattn":
+        print("Using Self Attention")
+        qa_model = QASelfAttnModel(FLAGS, id2word, word2id, emb_matrix)
 
     # Some GPU settings
     config=tf.ConfigProto()
@@ -210,6 +215,15 @@ def main(unused_argv):
             # Show examples with F1/EM scores
             _, _ = qa_model.check_f1_em(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10, print_to_screen=True)
 
+    elif FLAGS.mode == "visualize":
+        with tf.Session(config=config) as sess:
+
+            # Load best model
+            initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
+
+            # Visualize distribution of begin and end spans.
+            begin_total, end_total = qa_model.visualise_spans(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
+            np.save(begin_total)
 
     elif FLAGS.mode == "official_eval":
         if FLAGS.json_in_path == "":

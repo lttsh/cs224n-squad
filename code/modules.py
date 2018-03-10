@@ -184,15 +184,9 @@ class BidirectionAttn(object):
         tf.assert_equal(tf.shape(result), [BS, N*M, 2*H])
 
         #Compute all dot products
-        # Reshape needed for broadcasting and matrix multiplication
-        w_sim_1 = tf.tile(tf.expand_dims(w_sim_1, 0), [BS, 1]) # BS x 2H
-        w_sim_2 = tf.tile(tf.expand_dims(w_sim_2, 0), [BS, 1]) # BS x 2H
-        w_sim_3 = tf.tile(tf.expand_dims(w_sim_3, 0), [BS, 1]) # BS x 2H
-
-        term1 = tf.matmul(tf.reshape(contexts, (BS, N, 2*H)), tf.expand_dims(w_sim_1, -1)) # BS x N
-        term2 = tf.matmul(questions, tf.expand_dims(w_sim_2, -1)) # BS x M
-        term3 = tf.matmul(result, tf.expand_dims(w_sim_3, -1)) # BS x NM
-        term3 = tf.reshape(term3, (BS, N, M)) # BS x N x M
+        term1 = tf.reshape(tf.matmul(tf.reshape(contexts, (BS * N, 2*H)), tf.expand_dims(w_sim_1, -1)), (-1, N)) # BS x N
+        term2 = tf.reshape(tf.matmul(tf.reshape(questions, (BS * M, 2 * H)), tf.expand_dims(w_sim_2, -1)), (-1, M)) # BS x M
+        term3 = tf.reshape(tf.matmul(tf.reshape(result, (BS * N * M, 2*H)), tf.expand_dims(w_sim_3, -1)), (-1, N, M)) # BS x NM
         S = tf.reshape(term1,(-1, N, 1)) + term3 + tf.reshape(term2, (-1, 1, M))
         print("Building Similarity Matrix")
         return S

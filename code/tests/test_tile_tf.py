@@ -3,7 +3,7 @@ import tensorflow as tf
 H = 2
 N = 2
 M = 3
-BS = 5
+BS = 10
 
 def my_softmax(arr):
     max_elements = np.reshape(np.max(arr, axis = 2), (BS, N, 1))
@@ -55,13 +55,15 @@ def test_build_similarity(contexts, questions):
     result = tf.reshape(result, (-1, N * M, 2 * H)) # BS x (NxM) x 2H
     tf.assert_equal(tf.shape(result), [BS, N*M, 2*H])
 
-    w_sim_1 = tf.tile(tf.expand_dims(w_sim_1, 0), [BS, 1])
-    w_sim_2 = tf.tile(tf.expand_dims(w_sim_2, 0), [BS, 1])
-    w_sim_3 = tf.tile(tf.expand_dims(w_sim_3, 0), [BS, 1])
-    term1 = tf.matmul(tf.reshape(contexts, (BS, N, 2*H)), tf.expand_dims(w_sim_1, -1)) # BS x N
-    term2 = tf.matmul(questions, tf.expand_dims(w_sim_2, -1)) # BS x M
-    term3 = tf.matmul(result, tf.expand_dims(w_sim_3, -1)) # BS x N x M
-    term3 = tf.reshape(term3, (BS, N, M))
+    # w_sim_1 = tf.tile(tf.expand_dims(w_sim_1, 0), [BS, 1])
+    # w_sim_2 = tf.tile(tf.expand_dims(w_sim_2, 0), [BS, 1])
+    # w_sim_3 = tf.tile(tf.expand_dims(w_sim_3, 0), [BS, 1])
+    term1 = tf.matmul(tf.reshape(contexts, (BS * N, 2*H)), tf.expand_dims(w_sim_1, -1)) # BS x N
+    term1 = tf.reshape(term1, (-1, N))
+    term2 = tf.matmul(tf.reshape(questions, (BS * M, 2*H)), tf.expand_dims(w_sim_2, -1)) # BS x M
+    term2 = tf.reshape(term2, (-1, M))
+    term3 = tf.matmul(tf.reshape(result, (BS * N * M, 2* H)), tf.expand_dims(w_sim_3, -1))
+    term3 = tf.reshape(term3, (-1, N, M)) # BS x N x M
     S = tf.reshape(term1,(-1, N, 1)) + term3 + tf.reshape(term2, (-1, 1, M))
     return S
 

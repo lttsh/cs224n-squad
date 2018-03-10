@@ -211,6 +211,9 @@ class BidirectionAttn(object):
             1s where there's real input, 0s where there's padding
 
         Outputs:
+          alpha : tensor shape (batch_size, context_len, question_len) attention distribution
+          of context on questions
+          beta : tensor shape (batch_size, context_len) attention distribution for context.
           values_output: Tensor shape (batch_size, context_len, 4 * hidden_size).
             This is the attention output; the weighted sum of the values
             (using the attention distribution as weights) concatenated with a
@@ -251,7 +254,7 @@ class BidirectionAttn(object):
             # output = tf.Print(output, [output])
             # Apply dropout
             output = tf.nn.dropout(output, self.keep_prob)
-            return output
+            return alpha, tf.reshape(beta, (-1, N)), output
 
 class BasicAttn(object):
     """Module for basic attention.

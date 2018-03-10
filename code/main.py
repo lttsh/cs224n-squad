@@ -49,7 +49,7 @@ tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means
 tf.app.flags.DEFINE_string("model_name", "bidaf", "Define the model to be used.")
 tf.app.flags.DEFINE_string("rnn_cell", "GRU", "Choose RNN cell GRU/LSTM")
 tf.app.flags.DEFINE_integer("num_layers", 1, "Choose num of layers for embedding")
-tf.app.flags.DEFINE_integer("selfattn_size", 100, "Choose size of self attention vectors.")
+tf.app.flags.DEFINE_integer("selfattn_size", 50, "Choose size of self attention vectors.")
 tf.app.flags.DEFINE_string("select_mode", "default", "Choose start/end position selection heuristic. default/endafter")
 
 # Hyperparameters
@@ -59,7 +59,7 @@ tf.app.flags.DEFINE_float("dropout", 0.15, "Fraction of units randomly dropped o
 tf.app.flags.DEFINE_integer("batch_size", 100, "Batch size to use")
 tf.app.flags.DEFINE_integer("hidden_size", 200, "Size of the hidden states")
 tf.app.flags.DEFINE_integer("context_len", 400, "The maximum context length of your model")
-tf.app.flags.DEFINE_integer("question_len", 20, "The maximum question length of your model")
+tf.app.flags.DEFINE_integer("question_len", 30, "The maximum question length of your model")
 tf.app.flags.DEFINE_integer("embedding_size", 100, "Size of the pretrained word vectors. This needs to be one of the available GloVe dimensions: 50/100/200/300")
 
 # How often to print, save, eval

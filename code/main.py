@@ -46,7 +46,7 @@ tf.app.flags.DEFINE_string("experiment_name", "", "Unique name for your experime
 tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means train indefinitely")
 
 # Model options
-tf.app.flags.DEFINE_string("model_name", "bidaf", "Define the model to be used: baseline/bidaf/selfattn")
+tf.app.flags.DEFINE_string("model_name", "bidaf", "Define the model to be used.")
 tf.app.flags.DEFINE_string("rnn_cell", "GRU", "Choose RNN cell GRU/LSTM")
 tf.app.flags.DEFINE_integer("num_layers", 1, "Choose num of layers for embedding")
 tf.app.flags.DEFINE_integer("selfattn_size", 100, "Choose size of self attention vectors.")

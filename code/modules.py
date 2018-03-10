@@ -77,12 +77,6 @@ class RNNEncoder(object):
         if scope is None:
             scope = "RNNEncoder"
         with vs.variable_scope(scope):
-            def get_rnn_cell(hidden_size, keep_prob):
-                if self.mode == 'GRU':
-                    return DropoutWrapper(rnn_cell.GRUCell(self.hidden_size), input_keep_prob=self.keep_prob)
-                elif self.mode == 'LSTM':
-                    print("Got LSTM cell")
-                    return DropoutWrapper(tf.contrib.rnn.BasicLSTMCell(self.hidden_size), input_keep_prob=self.keep_prob)
             input_lens = tf.reduce_sum(masks, reduction_indices=1) # shape (batch_size)
             # Note: fw_out and bw_out are the hidden states for every timestep.
             # # Each is shape (batch_size, seq_len, hidden_size).
@@ -95,15 +89,15 @@ class RNNEncoder(object):
                 # Concatenate the forward and backward hidden states
                 out = tf.concat([fw_out, bw_out], 2)
             else:
-                inputs_list = tf.unstack(inputs, axis=1)
-                tf.assert_equal(len(inputs_list),tf.shape(inputs)[1])
-                out, _, _ = tf.contrib.rnn.stack_bidirectional_rnn(
+#                inputs_list = tf.unstack(inputs, axis=1)
+#                tf.assert_equal(len(inputs_list),tf.shape(inputs)[1])
+                out, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
                   self.rnn_cells_fw,
                   self.rnn_cells_bw,
-                  inputs_list,
+                  inputs,
                   sequence_length=input_lens,
                   dtype=tf.float32)
-                out = tf.stack(out, axis=1)
+               # out = tf.stack(out, axis=1)
                 tf.assert_equal(tf.shape(out), [tf.shape(inputs)[0], tf.shape(inputs)[1], 2 * self.hidden_size])
             out = tf.nn.dropout(out, self.keep_prob)
 
@@ -242,11 +236,11 @@ class BidirectionAttn(object):
         M = tf.shape(questions)[1]
 
         w_sim_1 = tf.get_variable('w_sim_1', shape=(2*H),
-            initializer=tf.constant_initializer(0)) # 2 * H
+            initializer=tf.contrib.layers.xavier_initializer()) # 2 * H
         w_sim_2 = tf.get_variable('w_sim_2', shape=(2*H),
-            initializer=tf.constant_initializer(0)) # 2 * H
+            initializer=tf.contrib.layers.xavier_initializer()) # 2 * H
         w_sim_3 = tf.get_variable('w_sim_3', shape =(2*H),
-            initializer=tf.constant_initializer(0)) # 2 * H
+            initializer=tf.contrib.layers.xavier_initializer()) # 2 * H
 
         # Compute matrix  of size BS x N x M x 2H which contains all c_i o q_j
         q_tile = tf.tile(tf.expand_dims(questions, 0), [N, 1, 1, 1]) #  N x BS x M x 2H

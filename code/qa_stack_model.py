@@ -30,13 +30,13 @@ from tensorflow.python.ops import embedding_ops
 from evaluate import exact_match_score, f1_score
 from data_batcher import get_batch_generator
 from pretty_print import print_example
-from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn, SelfAttn, BidirectionAttn
+from modules import RNNEncoder, SimpleSoftmaxLayer, SelfAttn, BidirectionAttn
 
 from qa_model import QAModel
 logging.basicConfig(level=logging.INFO)
 
 
-class QASelfAttnModel(QAModel):
+class QAStackModel(QAModel):
     """Extension of the QA Model that uses Self Attention"""
 
     def __init__(self, FLAGS, id2word, word2id, emb_matrix):

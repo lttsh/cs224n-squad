@@ -160,12 +160,12 @@ class SelfAttn(object):
     def build_graph(self, contexts, contexts_mask):
         """
         Inputs:
-          contexts: Tensor shape (BS, N, 2H).
+          contexts: Tensor shape (BS, N, H).
           contexts_mask: Tensor shape (BS, N).
             1s where there's real input, 0s where there's padding
 
         Outputs:
-          output: Tensor shape (batch_size, N, 2H).
+          output: Tensor shape (batch_size, N, H).
             This is the attention output
         """
         print("Graph for Self Attn")
@@ -175,11 +175,11 @@ class SelfAttn(object):
             C = self.attention_size
             self.weights_1 = tf.get_variable(
                 "W1",
-                shape=(2 * self.hidden_size, self.attention_size),
+                shape=(self.hidden_size, self.attention_size),
                 initializer=tf.contrib.layers.xavier_initializer())
             self.weights_2 = tf.get_variable(
                 "W2",
-                shape=(2 * self.hidden_size, self.attention_size),
+                shape=(self.hidden_size, self.attention_size),
                 initializer=tf.contrib.layers.xavier_initializer())
             self.v = tf.get_variable(
                 "v",
@@ -201,7 +201,7 @@ class SelfAttn(object):
             contexts_mask = tf.expand_dims(contexts_mask, 2) # BS x N x 1
             E_mask = contexts_mask * tf.transpose(contexts_mask, [0, 2, 1]) # BS x N x N
             _, attn_p = masked_softmax(E, E_mask, 2) # BS x N x N
-            output = tf.matmul(attn_p, contexts) # BS x N x 2H
+            output = tf.matmul(attn_p, contexts) # BS x N x H
             tf.assert_equal(tf.shape(output), tf.shape(contexts))
             # Apply dropout
             output = tf.nn.dropout(output, self.keep_prob)

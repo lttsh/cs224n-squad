@@ -10,7 +10,7 @@ cl upload experiments/$EXPERIMENT/best_checkpoint
 echo "Creating predictions"
 cl run --name gen-answers --request-docker-image abisee/cs224n-dfp:v4 \
  :code :best_checkpoint glove.txt:0x97c870/glove.6B.100d.txt data.json:0x4870af \
- 'python code/main.py --question_len=30 --hidden_size=64 --selfattn_size=64 --model_name=selfattn --mode=official_eval --num_layers=1 \
+ 'python code/main.py --question_len=30 --hidden_size=50 --selfattn_size=50 --model_name=stack --mode=official_eval --num_layers=1 \
  --glove_path=glove.txt --json_in_path=data.json --ckpt_load_dir=best_checkpoint'
 
 cl wait --tail gen-answers

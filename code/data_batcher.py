@@ -93,7 +93,7 @@ def padded(token_batch, batch_pad=0):
     return map(lambda token_list: token_list + [PAD_ID] * (maxlen - len(token_list)), token_batch)
 
 
-def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size, context_len, question_len, discard_long):
+def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size, context_len, question_len, discard_long, random=True):
     """
     Adds more batches into the "batches" list.
 
@@ -153,7 +153,8 @@ def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size
 
     # Sort by question length
     # Note: if you sort by context length, then you'll have batches which contain the same context many times (because each context appears several times, with different questions)
-    examples = sorted(examples, key=lambda e: len(e[2]))
+    if random:
+        examples = sorted(examples, key=lambda e: len(e[2]))
 
     # Make into batches and append to the list batches
     for batch_start in xrange(0, len(examples), batch_size):
@@ -164,14 +165,15 @@ def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size
         batches.append((context_ids_batch, context_tokens_batch, qn_ids_batch, qn_tokens_batch, ans_span_batch, ans_tokens_batch))
 
     # shuffle the batches
-    random.shuffle(batches)
+    if random:
+        random.shuffle(batches)
 
     toc = time.time()
     print "Refilling batches took %.2f seconds" % (toc-tic)
     return
 
 
-def get_batch_generator(word2id, context_path, qn_path, ans_path, batch_size, context_len, question_len, discard_long):
+def get_batch_generator(word2id, context_path, qn_path, ans_path, batch_size, context_len, question_len, discard_long, random=True):
     """
     This function returns a generator object that yields batches.
     The last batch in the dataset will be a partial batch.
@@ -184,13 +186,14 @@ def get_batch_generator(word2id, context_path, qn_path, ans_path, batch_size, co
       context_len, question_len: max length of context and question respectively
       discard_long: If True, discard any examples that are longer than context_len or question_len.
         If False, truncate those exmaples instead.
+      random: is the dataset shuffled ?
     """
     context_file, qn_file, ans_file = open(context_path), open(qn_path), open(ans_path)
     batches = []
 
     while True:
         if len(batches) == 0: # add more batches
-            refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size, context_len, question_len, discard_long)
+            refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size, context_len, question_len, discard_long, random)
         if len(batches) == 0:
             break
 

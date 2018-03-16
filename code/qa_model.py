@@ -274,6 +274,27 @@ class QAModel(object):
             end_pos = np.argmax(end_dist[start_pos:], axis=1)
         return start_pos, end_pos
 
+    def get_c2q_attention_dist(self, session, batch):
+        """
+        Run forward-pass only; get the attention distribution output
+
+        Inputs:
+          session: TensorFlow session
+          batch: Batch object
+
+        Returns:
+          attention_dist: numpy arrays shape (batch_size, question_len, context_len).
+        """
+        input_feed = {}
+        input_feed[self.context_ids] = batch.context_ids
+        input_feed[self.context_mask] = batch.context_mask
+        input_feed[self.qn_ids] = batch.qn_ids
+        input_feed[self.qn_mask] = batch.qn_mask
+        # note you don't supply keep_prob here, so it will default to 1 i.e. no dropout
+
+        output_feed = [self.c2q_attn_dist]
+        [c2q_attn_dist] = session.run(output_feed, input_feed)
+        return c2q_attn_dist
 
     def get_dev_loss(self, session, dev_context_path, dev_qn_path, dev_ans_path):
         """
@@ -394,48 +415,102 @@ class QAModel(object):
 
         return f1_total, em_total
 
-    def visualise_spans(self, session, context_path, qn_path, ans_path, dataset, num_samples=100):
+    def get_spans(self, session, context_path, qn_path, ans_path, dataset, num_samples=0):
         """
         Sample from the provided (train/dev) set.
-        For each sample, print begin and end span probabilities
         Inputs:
           session: TensorFlow session
           qn_path, context_path, ans_path: paths to {dev/train}.{question/context/answer} data files.
           dataset: string. Either "train" or "dev". Just for logging purposes.
-          num_samples: int. How many samples to use. If num_samples=0 then do whole dataset.
         Returns:
           begin_prob, end_prob: The average probabilities the sampled examples.
         """
-        example_num = 0
         total_start_dists = []
         total_end_dists = []
-        tic = time.time()
-
-        # Note here we select discard_long=False because we want to sample from the entire dataset
-        # That means we're truncating, rather than discarding, examples with too-long context or questions
-        for batch in get_batch_generator(self.word2id, context_path, qn_path, ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=False):
+        f1_em_scores = []
+        example_num = 0
+        for batch in get_batch_generator(
+            self.word2id,
+            context_path,
+            qn_path,
+            ans_path,
+            self.FLAGS.batch_size,
+            context_len=self.FLAGS.context_len,
+            question_len=self.FLAGS.question_len,
+            discard_long=False,
+            random=False):
 
             pred_start_dists, pred_end_dists = self.get_prob_dists(session, batch)
+            pred_start_pos, pred_end_pos = self.get_start_end_pos(session, batch)
 
             # Convert the start and end positions to lists length batch_size
+            pred_start_pos = pred_start_pos.tolist() # list length batch_size
+            pred_end_pos = pred_end_pos.tolist() # list length batch_size
             pred_start_dists = pred_start_dists.tolist() # list length batch_size
             pred_end_dists = pred_end_dists.tolist() # list length batch_size
 
-            for (pred_start_dist, pred_end_dist) in zip(pred_start_dists, pred_end_dists):
+            for ex_idx, (pred_ans_start, pred_ans_end, true_ans_tokens) in enumerate(zip(pred_start_pos, pred_end_pos, batch.ans_tokens)):
                 example_num += 1
 
-                total_start_dists.append(pred_start_dist)
-                total_end_dists.append(end_start_dist)
-                print('Processed example %d' % example_num)
+                # Get the predicted answer
+                # Important: batch.context_tokens contains the original words (no UNKs)
+                # You need to use the original no-UNK version when measuring F1/EM
+                pred_ans_tokens = batch.context_tokens[ex_idx][pred_ans_start : pred_ans_end + 1]
+                pred_answer = " ".join(pred_ans_tokens)
 
+                # Get true answer (no UNKs)
+                true_answer = " ".join(true_ans_tokens)
+
+                # Calc F1/EM
+                f1 = f1_score(pred_answer, true_answer)
+                em = exact_match_score(pred_answer, true_answer)
+                f1_em_scores.append((f1,em))
+                # print_example(self.word2id, batch.context_tokens[ex_idx], batch.qn_tokens[ex_idx], batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start, pred_ans_end, true_answer, pred_answer, f1, em)
                 if num_samples != 0 and example_num >= num_samples:
                     break
 
+            # Convert the start and end positions to lists length batch_size
+            total_end_dists += pred_end_dists
+            total_start_dists += pred_start_dists
             if num_samples != 0 and example_num >= num_samples:
                 break
+        return np.asarray(total_start_dists), np.asarray(total_end_dists), np.asarray(f1_em_scores)
 
-        toc = time.time()
-        return np.asarray(total_start_dists), np.asarray(total_end_dists)
+    def get_c2q_attention(self, session, context_path, qn_path, ans_path, dataset, num_samples=0):
+        """
+        Sample from the provided (train/dev) set.
+        Inputs:
+          session: TensorFlow session
+          qn_path, context_path, ans_path: paths to {dev/train}.{question/context/answer} data files.
+          dataset: string. Either "train" or "dev". Just for logging purposes.
+        Returns:
+          begin_prob, end_prob: The average probabilities the sampled examples.
+        """
+        total_c2q_attention = []
+        example_num = 0
+        for batch in get_batch_generator(
+            self.word2id,
+            context_path,
+            qn_path,
+            ans_path,
+            self.FLAGS.batch_size,
+            context_len=self.FLAGS.context_len,
+            question_len=self.FLAGS.question_len,
+            discard_long=False,
+            random=False):
+
+            c2q_dists = self.get_c2q_attention_dist(session, batch)
+            c2q_list = c2q_dists.tolist() # list length batch_size
+
+            for _, (c2q_dist) in enumerate(c2q_list):
+                example_num += 1
+                total_c2q_attention.append(c2q_dist)
+                # print_example(self.word2id, batch.context_tokens[ex_idx], batch.qn_tokens[ex_idx], batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start, pred_ans_end, true_answer, pred_answer, f1, em)
+                if num_samples != 0 and example_num >= num_samples:
+                    break
+            if num_samples != 0 and example_num >= num_samples:
+                break
+        return np.asarray(total_c2q_attention)
 
     def train(self, session, train_context_path, train_qn_path, train_ans_path, dev_qn_path, dev_context_path, dev_ans_path):
         """

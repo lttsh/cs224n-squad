@@ -24,6 +24,7 @@ import sys
 import logging
 
 import tensorflow as tf
+import numpy as np
 
 from qa_model import QAModel
 from qa_bidaf_model import QABidafModel
@@ -42,7 +43,7 @@ EXPERIMENTS_DIR = os.path.join(MAIN_DIR, "experiments") # relative path of exper
 
 # High-level options
 tf.app.flags.DEFINE_integer("gpu", 0, "Which GPU to use, if you have multiple.")
-tf.app.flags.DEFINE_string("mode", "train", "Available modes: train / show_examples / official_eval")
+tf.app.flags.DEFINE_string("mode", "train", "Available modes: train / show_examples / official_eval / getinfo")
 tf.app.flags.DEFINE_string("experiment_name", "", "Unique name for your experiment. This will create a directory by this name in the experiments/ directory, which will hold all data related to this experiment")
 tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means train indefinitely")
 
@@ -225,8 +226,13 @@ def main(unused_argv):
             initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
 
             # Visualize distribution of begin and end spans.
-            begin_total, end_total = qa_model.visualise_spans(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
-            np.save(begin_total)
+            # begin_total, end_total, f1_em_scores = qa_model.get_spans(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev")
+            # np.save(os.path.join(FLAGS.train_dir, "begin_span"), begin_total)
+            # np.save(os.path.join(FLAGS.train_dir, "end_span"), end_total)
+            # np.save(os.path.join(FLAGS.train_dir, "f1_em"), f1_em_scores)
+            # Visualize distribution of Context to Question attention
+            c2q_attn = qa_model.get_c2q_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
+            np.save(os.path.join(FLAGS.train_dir, "c2q_attn"), c2q_attn)
 
     elif FLAGS.mode == "official_eval":
         if FLAGS.json_in_path == "":

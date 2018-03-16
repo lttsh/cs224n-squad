@@ -74,7 +74,8 @@ class QABidafModel(QAModel):
 
         # Use context hidden states to attend to question hidden states
         attn_layer = BidirectionAttn(self.keep_prob, self.FLAGS.hidden_size)
-        self.c2q_dist, self.q2c_dist, attn_output = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens, self.context_mask) # attn_output is shape (batch_size, context_len, hidden_size*4)
+        self.c2q_attn_dist, self.q2c_attn_dist, attn_output = \
+            attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens, self.context_mask) # attn_output is shape (batch_size, context_len, hidden_size*4)
 
         # Concat attn_output to context_hiddens to get blended_reps
         blended_reps = tf.concat([context_hiddens, attn_output], axis=2) # (batch_size, context_len, hidden_size*8)
@@ -95,26 +96,3 @@ class QABidafModel(QAModel):
         with vs.variable_scope("EndDist"):
             softmax_layer_end = SimpleSoftmaxLayer()
             self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_final, self.context_mask)
-
-    def get_attention_outputs(self, session, batch):
-        """
-        Run forward-pass only; get probability distributions for attention
-
-        Inputs:
-          session: TensorFlow session
-          batch: Batch object
-
-        Returns:
-          c2q_dist: (batch_size, context_len, question_len)
-          q2c_dist: (batch_size, context_len)
-        """
-        input_feed = {}
-        input_feed[self.context_ids] = batch.context_ids
-        input_feed[self.context_mask] = batch.context_mask
-        input_feed[self.qn_ids] = batch.qn_ids
-        input_feed[self.qn_mask] = batch.qn_mask
-        # note you don't supply keep_prob here, so it will default to 1 i.e. no dropout
-
-        output_feed = [self.c2q_dist, self.q2c_dist]
-        [c2q_dist, q2c_dist] = session.run(output_feed, input_feed)
-        return c2q_dist, q2c_dist

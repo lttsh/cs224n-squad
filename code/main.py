@@ -233,6 +233,11 @@ def main(unused_argv):
             # Visualize distribution of Context to Question attention
             c2q_attn = qa_model.get_c2q_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
             np.save(os.path.join(FLAGS.train_dir, "c2q_attn"), c2q_attn)
+            q2c_attn = qa_model.get_q2c_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
+            if len(q2c_attn > 0):
+                np.save(os.path.join(FLAGS.train_dir, "q2c_attn"), q2c_attn)
+            else:
+                print 'This model doesn\'t have question to context attention'
 
     elif FLAGS.mode == "official_eval":
         if FLAGS.json_in_path == "":

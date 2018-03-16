@@ -6,7 +6,7 @@ end_probs = np.load('experiments/baseline/end_span.npy')
 begin_probs = np.load('experiments/baseline/begin_span.npy')
 f1_em = np.load('experiments/baseline/f1_em.npy')
 c2q_dist = np.load('experiments/baseline/c2q_attn.npy')
-
+print c2q_dist.shape
 end_answer = np.argmax(end_probs, axis=1)
 begin_answer = np.argmax(begin_probs, axis=1)
 model_answer = np.stack([begin_answer, end_answer], axis=1)

@@ -71,15 +71,16 @@ class QAStackModel(QAModel):
 
         # Use context hidden states to attend to question hidden states
         bidaf_layer = BidirectionAttn(self.keep_prob, self.FLAGS.hidden_size)
-        bidaf_output = bidaf_layer.build_graph(
-          question_hiddens, 
-          self.qn_mask, 
+        self.c2q_attn_dist, self.q2c_attn_dist, bidaf_output = bidaf_layer.build_graph(
+          question_hiddens,
+          self.qn_mask,
           context_hiddens,
-          self.context_mask) 
+          self.context_mask)
+
         # attn_output is shape (batch_size, context_len, hidden_size*6)
         bidaf_output = tf.concat([context_hiddens, bidaf_output], axis=2) # bs, c_l, 8h
         self_attn_layer = SelfAttn(self.keep_prob, 8 * self.FLAGS.hidden_size, self.FLAGS.selfattn_size)
-        self_attn_output = self_attn_layer.build_graph(bidaf_output, self.context_mask) # batch_size, context_len, 2 * hidden_size
+        self.self_attn_dist, self_attn_output = self_attn_layer.build_graph(bidaf_output, self.context_mask) # batch_size, context_len, 2 * hidden_size
 
         # Concat attn_output to context_hiddens to get blended_reps
         blended_reps = tf.concat([bidaf_output, self_attn_output], axis=2) # (batch_size, context_len, hidden_size*10)

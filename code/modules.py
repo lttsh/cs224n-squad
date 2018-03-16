@@ -206,7 +206,7 @@ class SelfAttn(object):
             # Apply dropout
             output = tf.nn.dropout(output, self.keep_prob)
 
-            return output
+            return self_attn_dist, output
 
 class BidirectionAttn(object):
     """Module for bidirectional Attention.

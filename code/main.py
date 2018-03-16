@@ -29,6 +29,7 @@ from qa_model import QAModel
 from qa_bidaf_model import QABidafModel
 from qa_baseline_model import QABaselineModel
 from qa_selfattn_model import QASelfAttnModel
+from qa_stack_model import QAStackModel
 from vocab import get_glove
 from official_eval_helper import get_json_data, generate_answers
 
@@ -59,7 +60,7 @@ tf.app.flags.DEFINE_float("dropout", 0.15, "Fraction of units randomly dropped o
 tf.app.flags.DEFINE_integer("batch_size", 100, "Batch size to use")
 tf.app.flags.DEFINE_integer("hidden_size", 200, "Size of the hidden states")
 tf.app.flags.DEFINE_integer("context_len", 400, "The maximum context length of your model")
-tf.app.flags.DEFINE_integer("question_len", 20, "The maximum question length of your model")
+tf.app.flags.DEFINE_integer("question_len", 30, "The maximum question length of your model")
 tf.app.flags.DEFINE_integer("embedding_size", 100, "Size of the pretrained word vectors. This needs to be one of the available GloVe dimensions: 50/100/200/300")
 
 # How often to print, save, eval
@@ -150,10 +151,12 @@ def main(unused_argv):
         qa_model = QABaselineModel(FLAGS, id2word, word2id, emb_matrix)
     elif FLAGS.model_name == "bidaf":
         qa_model = QABidafModel(FLAGS, id2word, word2id, emb_matrix)
-        print("Using BIDAF model")
     elif FLAGS.model_name == "selfattn":
         print("Using Self Attention")
         qa_model = QASelfAttnModel(FLAGS, id2word, word2id, emb_matrix)
+    elif FLAGS.model_name == "stack":
+        print("Using stack BIDAF/SA")
+        qa_model = QAStackModel(FLAGS, id2word, word2id, emb_matrix)
 
     # Some GPU settings
     config=tf.ConfigProto()

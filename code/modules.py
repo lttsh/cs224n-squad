@@ -36,7 +36,7 @@ class RNNEncoder(object):
     This code uses a bidirectional GRU, but you could experiment with other types of RNN.
     """
 
-    def __init__(self, hidden_size, keep_prob, num_layers=1, mode="GRU"):
+    def __init__(self, hidden_size, keep_prob, num_layers=1, mode="GRU", name=None):
         """
         Inputs:
           hidden_size: int. Hidden size of the RNN
@@ -46,6 +46,7 @@ class RNNEncoder(object):
         self.keep_prob = keep_prob
         self.num_layers=num_layers
         self.mode = mode
+        self.name=name
         self.rnn_cells_fw = []
         self.rnn_cells_bw = []
         for _ in range(num_layers):
@@ -72,7 +73,10 @@ class RNNEncoder(object):
           out: Tensor shape (batch_size, seq_len, hidden_size*2).
             This is all hidden states (fw and bw hidden states are concatenated).
         """
-        with vs.variable_scope("RNNEncoder"):
+        scope = self.name
+        if scope is None:
+            scope = "RNNEncoder"
+        with vs.variable_scope(scope):
             input_lens = tf.reduce_sum(masks, reduction_indices=1) # shape (batch_size)
             # Note: fw_out and bw_out are the hidden states for every timestep.
             # # Each is shape (batch_size, seq_len, hidden_size).
@@ -137,6 +141,73 @@ class SimpleSoftmaxLayer(object):
 
             return masked_logits, prob_dist
 
+class SelfAttn(object):
+    """Module for self attention.
+    """
+
+    def __init__(self, keep_prob, hidden_size, attention_size):
+        """
+        Inputs:
+          keep_prob: tensor containing a single scalar that is the keep probability (for dropout)
+          hidden_size: hidden size of the hidden representation. int
+          attention_size: size of the attention vector
+        """
+        print("Building Self Attention Layer")
+        self.keep_prob = keep_prob
+        self.hidden_size = hidden_size
+        self.attention_size = attention_size
+
+    def build_graph(self, contexts, contexts_mask):
+        """
+        Inputs:
+          contexts: Tensor shape (BS, N, H).
+          contexts_mask: Tensor shape (BS, N).
+            1s where there's real input, 0s where there's padding
+
+        Outputs:
+          output: Tensor shape (batch_size, N, H).
+            This is the attention output
+        """
+        print("Graph for Self Attn")
+        with vs.variable_scope("SelfAttn"):
+            B = tf.shape(contexts)[0]
+            N = tf.shape(contexts)[1]
+            C = self.attention_size
+            self.weights_1 = tf.get_variable(
+                "W1",
+                shape=(self.hidden_size, self.attention_size),
+                initializer=tf.contrib.layers.xavier_initializer())
+            self.weights_2 = tf.get_variable(
+                "W2",
+                shape=(self.hidden_size, self.attention_size),
+                initializer=tf.contrib.layers.xavier_initializer())
+            self.v = tf.get_variable(
+                "v",
+                shape=(self.attention_size, 1),
+                initializer=tf.contrib.layers.xavier_initializer())
+
+            values_1 = tf.reshape(tf.matmul(tf.reshape(contexts, (B * N, -1)), self.weights_1), (-1, N, C)) # BS x N x C
+            values_2 = tf.reshape(tf.matmul(tf.reshape(contexts, (B * N, -1)), self.weights_2), (-1, N, C)) # BS x N x C
+            tf.assert_equal(tf.shape(values_1), [B, N, C])
+            tf.assert_equal(tf.shape(values_2), [B, N, C])
+            values_1 = tf.expand_dims(values_1, axis=1) # BS x 1 x N x C
+            values_2 = tf.expand_dims(values_2, axis=2) # BS x N x 1 x C
+            additive_value = values_1 + values_2 # BS x N x N x C
+            additive_value = tf.tanh(additive_value)
+            tf.assert_equal(tf.shape(additive_value), [B, N, N, C])
+            E = tf.matmul(tf.reshape(additive_value, (B * N * N, C)), self.v) # BS x N x N x 1
+            E = tf.reshape(E, (-1, N, N)) # BS x N x N
+            tf.assert_equal(tf.shape(E), [B, N, N])
+            contexts_mask = tf.expand_dims(contexts_mask, 2) # BS x N x 1
+            E_mask = contexts_mask * tf.transpose(contexts_mask, [0, 2, 1]) # BS x N x N
+            _, attn_p = masked_softmax(E, E_mask, 2) # BS x N x N
+            output = tf.matmul(attn_p, contexts) # BS x N x H
+            tf.assert_equal(tf.shape(output), tf.shape(contexts))
+            # Apply dropout
+            output = tf.nn.dropout(output, self.keep_prob)
+
+            return output
+
 class BidirectionAttn(object):
     """Module for bidirectional Attention.
     """
@@ -184,15 +255,9 @@ class BidirectionAttn(object):
         tf.assert_equal(tf.shape(result), [BS, N*M, 2*H])
 
         #Compute all dot products
-        # Reshape needed for broadcasting and matrix multiplication
-        w_sim_1 = tf.tile(tf.expand_dims(w_sim_1, 0), [BS, 1]) # BS x 2H
-        w_sim_2 = tf.tile(tf.expand_dims(w_sim_2, 0), [BS, 1]) # BS x 2H
-        w_sim_3 = tf.tile(tf.expand_dims(w_sim_3, 0), [BS, 1]) # BS x 2H
-
-        term1 = tf.matmul(tf.reshape(contexts, (BS, N, 2*H)), tf.expand_dims(w_sim_1, -1)) # BS x N
-        term2 = tf.matmul(questions, tf.expand_dims(w_sim_2, -1)) # BS x M
-        term3 = tf.matmul(result, tf.expand_dims(w_sim_3, -1)) # BS x NM
-        term3 = tf.reshape(term3, (BS, N, M)) # BS x N x M
+        term1 = tf.reshape(tf.matmul(tf.reshape(contexts, (BS * N, 2*H)), tf.expand_dims(w_sim_1, -1)), (-1, N)) # BS x N
+        term2 = tf.reshape(tf.matmul(tf.reshape(questions, (BS * M, 2 * H)), tf.expand_dims(w_sim_2, -1)), (-1, M)) # BS x M
+        term3 = tf.reshape(tf.matmul(tf.reshape(result, (BS * N * M, 2*H)), tf.expand_dims(w_sim_3, -1)), (-1, N, M)) # BS x NM
         S = tf.reshape(term1,(-1, N, 1)) + term3 + tf.reshape(term2, (-1, 1, M))
         print("Building Similarity Matrix")
         return S

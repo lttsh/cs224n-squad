@@ -323,6 +323,30 @@ class QAModel(object):
             return q2c_attn_dist
         return None
 
+    def get_self_attention_dist(self, session, batch):
+        """
+        Run forward-pass only; get the attention distribution output
+
+        Inputs:
+          session: TensorFlow session
+          batch: Batch object
+
+        Returns:
+          attention_dist: numpy arrays shape (batch_size, context_len).
+        """
+        if self.self_attn_dist is not None:
+            input_feed = {}
+            input_feed[self.context_ids] = batch.context_ids
+            input_feed[self.context_mask] = batch.context_mask
+            input_feed[self.qn_ids] = batch.qn_ids
+            input_feed[self.qn_mask] = batch.qn_mask
+            # note you don't supply keep_prob here, so it will default to 1 i.e. no dropout
+
+            output_feed = [self.self_attn_dist]
+            [self_attn_dist] = session.run(output_feed, input_feed)
+            return self_attn_dist
+        return None
+
     def get_dev_loss(self, session, dev_context_path, dev_qn_path, dev_ans_path):
         """
         Get loss for entire dev set.
@@ -576,6 +600,44 @@ class QAModel(object):
             if num_samples != 0 and example_num >= num_samples:
                 break
         return np.asarray(total_q2c_attention)
+
+    def get_self_attention(self, session, context_path, qn_path, ans_path, dataset, num_samples=0):
+        """
+        Sample from the provided (train/dev) set.
+        Inputs:
+          session: TensorFlow session
+          qn_path, context_path, ans_path: paths to {dev/train}.{question/context/answer} data files.
+          dataset: string. Either "train" or "dev". Just for logging purposes.
+        Returns:
+          Question to Context attention output
+        """
+        total_self_attention = []
+        example_num = 0
+        for batch in get_batch_generator(
+            self.word2id,
+            context_path,
+            qn_path,
+            ans_path,
+            self.FLAGS.batch_size,
+            context_len=self.FLAGS.context_len,
+            question_len=self.FLAGS.question_len,
+            discard_long=False,
+            random=False):
+
+            self_dists = self.get_self_attention_dist(session, batch)
+            if self_dists is None:
+                break
+
+            self_list = self_dists.tolist() # list length batch_size
+            for _, (self_dist) in enumerate(self_list):
+                example_num += 1
+                total_self_attention.append(self_dists)
+                # print_example(self.word2id, batch.context_tokens[ex_idx], batch.qn_tokens[ex_idx], batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start, pred_ans_end, true_answer, pred_answer, f1, em)
+                if num_samples != 0 and example_num >= num_samples:
+                    break
+            if num_samples != 0 and example_num >= num_samples:
+                break
+        return np.asarray(total_self_attention)
 
     def train(self, session, train_context_path, train_qn_path, train_ans_path, dev_qn_path, dev_context_path, dev_ans_path):
         """

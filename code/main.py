@@ -226,10 +226,11 @@ def main(unused_argv):
             initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
 
             # Visualize distribution of begin and end spans.
-            # begin_total, end_total, f1_em_scores = qa_model.get_spans(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev")
-            # np.save(os.path.join(FLAGS.train_dir, "begin_span"), begin_total)
-            # np.save(os.path.join(FLAGS.train_dir, "end_span"), end_total)
-            # np.save(os.path.join(FLAGS.train_dir, "f1_em"), f1_em_scores)
+            begin_total, end_total, f1_em_scores = qa_model.get_spans(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev")
+            np.save(os.path.join(FLAGS.train_dir, "begin_span"), begin_total)
+            np.save(os.path.join(FLAGS.train_dir, "end_span"), end_total)
+            np.save(os.path.join(FLAGS.train_dir, "f1_em"), f1_em_scores)
+
             # Visualize distribution of Context to Question attention
             c2q_attn = qa_model.get_c2q_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
             np.save(os.path.join(FLAGS.train_dir, "c2q_attn"), c2q_attn)
@@ -238,6 +239,12 @@ def main(unused_argv):
                 np.save(os.path.join(FLAGS.train_dir, "q2c_attn"), q2c_attn)
             else:
                 print 'This model doesn\'t have question to context attention'
+            self_attn = qa_model.get_self_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
+            if len(self_attn > 0):
+                np.save(os.path.join(FLAGS.train_dir, "self_attn"), self_attn)
+            else:
+                print 'This model deosn\'t have self attention'
+
 
     elif FLAGS.mode == "official_eval":
         if FLAGS.json_in_path == "":

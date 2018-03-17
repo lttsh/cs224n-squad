@@ -33,7 +33,7 @@ from qa_selfattn_model import QASelfAttnModel
 from qa_stack_model import QAStackModel
 from qa_pointer_model import QAPointerModel
 from vocab import get_glove
-from official_eval_helper import get_json_data, generate_answers
+from official_eval_helper import get_json_data, generate_answers, generate_distributions, generate_answers_from_dist
 
 
 logging.basicConfig(level=logging.INFO)
@@ -78,7 +78,7 @@ tf.app.flags.DEFINE_string("data_dir", DEFAULT_DATA_DIR, "Where to find preproce
 tf.app.flags.DEFINE_string("ckpt_load_dir", "", "For official_eval mode, which directory to load the checkpoint fron. You need to specify this for official_eval mode.")
 tf.app.flags.DEFINE_string("json_in_path", "", "For official_eval mode, path to JSON input file. You need to specify this for official_eval_mode.")
 tf.app.flags.DEFINE_string("json_out_path", "predictions.json", "Output path for official_eval mode. Defaults to predictions.json")
-
+tf.app.flags.DEFINE_string("ensemble_dir", "", "Directory to put the ensemble outputs.")
 
 FLAGS = tf.app.flags.FLAGS
 os.environ["CUDA_VISIBLE_DEVICES"] = str(FLAGS.gpu)
@@ -123,7 +123,7 @@ def main(unused_argv):
     print "This code was developed and tested on TensorFlow 1.4.1. Your TensorFlow version: %s" % tf.__version__
 
     # Define train_dir
-    if not FLAGS.experiment_name and not FLAGS.train_dir and FLAGS.mode != "official_eval":
+    if not FLAGS.experiment_name and not FLAGS.train_dir and FLAGS.mode != "official_eval" and FLAGS.mode!= "ensemble_write":
         raise Exception("You need to specify either --experiment_name or --train_dir")
     FLAGS.train_dir = FLAGS.train_dir or os.path.join(EXPERIMENTS_DIR, FLAGS.experiment_name)
 
@@ -229,7 +229,7 @@ def main(unused_argv):
             # Load best model
             initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
 
-            # Visualize distribution of begin and end spans.
+            # Get distribution of begin and end spans.
             begin_total, end_total, f1_em_scores = qa_model.get_spans(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev")
             np.save(os.path.join(FLAGS.train_dir, "begin_span"), begin_total)
             np.save(os.path.join(FLAGS.train_dir, "end_span"), end_total)
@@ -249,6 +249,56 @@ def main(unused_argv):
             else:
                 print 'This model deosn\'t have self attention'
 
+
+    elif FLAGS.mode == "ensemble_write":
+        if FLAGS.json_in_path == "":
+            raise Exception("For ensembling mode, you need to specify --json_in_path")
+        if FLAGS.ckpt_load_dir == "":
+            raise Exception("For ensembling mode, you need to specify --ckpt_load_dir")
+        # Read the JSON data from file
+        qn_uuid_data, context_token_data, qn_token_data = get_json_data(FLAGS.json_in_path)
+
+        with tf.Session(config=config) as sess:
+            # Load model
+            initialize_model(sess, qa_model, FLAGS.ckpt_load_dir, expect_exists=True)
+
+            distributions = generate_distributions(sess, qa_model, word2id, qn_uuid_data, context_token_data, qn_token_data)
+            # np uuid -> (2, context_len)
+            # Write the uuid->answer mapping a to json file in root dir
+            save_path= os.path.join(FLAGS.ensemble_dir, "distribution_" + FLAGS.model_name+ '.json')
+            print "Writing distributions to %s..." % save_path
+            with io.open(save_path, 'w', encoding='utf-8') as f:
+                f.write(unicode(json.dumps(distributions, ensure_ascii=False)))
+                print "Wrote predictions to %s" % save_path
+
+    elif FLAGS.mode == "ensemble_predict":
+        if FLAGS.json_in_path == "":
+            raise Exception("For ensembling mode, you need to specify --json_in_path")
+        models = ['baseline']
+        distributions = [os.path.join(FLAGS.ensemble_dir, "distribution_" + m + ".json") for m in models]
+        total_dict = {}
+        for d in distributions:
+            with open(d) as prediction_file:
+                predictions = json.load(prediction_file)
+                for (key, item) in predictions.items():
+                    if total_dict.get(key, None) is None:
+                        total_dict[key] = np.asarray(item)
+                    else:
+                        total_dict[key][0] += item[0]
+                        total_dict[key][1] += item[1]
+
+        for (key, item) in total_dict.items():
+            total_dict[key][0]/=len(models)
+            total_dict[key][1] /=len(models)
+        # Read the JSON data from file
+        qn_uuid_data, context_token_data, qn_token_data = get_json_data(FLAGS.json_in_path)
+        answers_dict = generate_answers_from_dist(None, qa_model, total_dict, word2id, qn_uuid_data, context_token_data, qn_token_data)
+
+        # Write the uuid->answer mapping a to json file in root dir
+        print "Writing predictions to %s..." % FLAGS.json_out_path
+        with io.open(FLAGS.json_out_path, 'w', encoding='utf-8') as f:
+            f.write(unicode(json.dumps(answers_dict, ensure_ascii=False)))
+            print "Wrote predictions to %s" % FLAGS.json_out_path
 
     elif FLAGS.mode == "official_eval":
         if FLAGS.json_in_path == "":

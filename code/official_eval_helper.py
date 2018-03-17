@@ -279,3 +279,98 @@ def generate_answers(session, model, word2id, qn_uuid_data, context_token_data, 
     print "Finished generating answers for dataset."
 
     return uuid2ans
+
+
+def generate_distributions(session, model, word2id, qn_uuid_data, context_token_data, qn_token_data):
+    """
+    Given a model, and a set of (context, question) pairs, each with a unique ID,
+    use the model to generate distributions for each pair, and return a dictionary mapping
+    each unique ID to the generated answer.
+
+    Inputs:
+      session: TensorFlow session
+      model: QAModel
+      word2id: dictionary mapping word (string) to word id (int)
+      qn_uuid_data, context_token_data, qn_token_data: lists
+
+    Outputs:
+      uuid2ans: dictionary mapping uuid (string) to predicted distributions
+    """
+    data_size = len(qn_uuid_data)
+    distributions = {}
+    num_batches = ((data_size-1) / model.FLAGS.batch_size) + 1
+    batch_num = 0
+
+    print "Generating predictions..."
+
+    for batch in get_batch_generator(word2id, qn_uuid_data, context_token_data, qn_token_data, model.FLAGS.batch_size, model.FLAGS.context_len, model.FLAGS.question_len):
+
+        # Get the predicted spans
+        pred_start_dists, pred_end_dists = model.get_prob_dists(session, batch)
+
+        # Convert pred_start_batch and pred_end_batch to lists length batch_size
+        pred_start_batch = pred_start_dists.tolist()
+        pred_end_batch = pred_end_dists.tolist()
+
+        # For each example in the batch:
+        for ex_idx, (pred_start, pred_end) in enumerate(zip(pred_start_batch, pred_end_batch)):
+
+            # Detokenize and add to dict
+            uuid = batch.uuids[ex_idx]
+            distributions[uuid] = [pred_start, pred_end]
+        batch_num += 1
+
+        if batch_num % 10 == 0:
+            print "Generated predictions for %i/%i batches = %.2f%%" % (batch_num, num_batches, batch_num*100.0/num_batches)
+
+    print "Finished generating predictions for dataset."
+    return distributions
+
+def generate_answers_from_dist(sess, model, total_dict, word2id, qn_uuid_data, context_token_data, qn_token_data):
+    """
+    Given a model, and a set of (context, question) pairs, each with a unique ID,
+    use the model to generate an answer for each pair, and return a dictionary mapping
+    each unique ID to the generated answer.
+
+    Inputs:
+      session: TensorFlow session
+      total_dict: dict uuid -> distributions
+      word2id: dictionary mapping word (string) to word id (int)
+      qn_uuid_data, context_token_data, qn_token_data: lists
+
+    Outputs:
+      uuid2ans: dictionary mapping uuid (string) to predicted answer (string; detokenized)
+    """
+    uuid2ans = {} # maps uuid to string containing predicted answer
+    data_size = len(qn_uuid_data)
+    num_batches = ((data_size-1) / model.FLAGS.batch_size) + 1
+    batch_num = 0
+    detokenizer = MosesDetokenizer()
+
+    print "Generating answers..."
+
+    for batch in get_batch_generator(word2id, qn_uuid_data, context_token_data, qn_token_data, model.FLAGS.batch_size, model.FLAGS.context_len, model.FLAGS.question_len):
+        # For each example in the batch:
+        for (ex_idx, uuid) in enumerate(batch.uuids):
+            pred_start = np.argmax(total_dict[uuid][0])
+            pred_end = np.argmax(total_dict[uuid][1])
+
+            # Original context tokens (no UNKs or padding) for this example
+            context_tokens = batch.context_tokens[ex_idx] # list of strings
+
+            # Check the predicted span is in range
+            assert pred_start in range(len(context_tokens))
+            assert pred_end in range(len(context_tokens))
+
+            # Predicted answer tokens
+            pred_ans_tokens = context_tokens[pred_start : pred_end +1] # list of strings
+            uuid2ans[uuid] = detokenizer.detokenize(pred_ans_tokens, return_str=True)
+
+        batch_num += 1
+
+        if batch_num % 10 == 0:
+            print "Generated answers for %i/%i batches = %.2f%%" % (batch_num, num_batches, batch_num*100.0/num_batches)
+
+    print "Finished generating answers for dataset."
+
+    return uuid2ans

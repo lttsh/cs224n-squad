@@ -71,10 +71,10 @@ class QASelfAttnModel(QAModel):
 
         # Use context hidden states to attend to question hidden states
         attn_layer = BasicAttn(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
-        _, attn_output = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens) # attn_output is shape (batch_size, context_len, hidden_size*2)
+        self.c2q_attn_dist, attn_output = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens) # attn_output is shape (batch_size, context_len, hidden_size*2)
 
         self_attn_layer = SelfAttn(self.keep_prob, 2 * self.FLAGS.hidden_size, self.FLAGS.selfattn_size)
-        self_attn_output = self_attn_layer.build_graph(attn_output, self.context_mask) # batch_size, context_len, 2 * hidden_size
+        self.self_attn_dist, self_attn_output = self_attn_layer.build_graph(attn_output, self.context_mask) # batch_size, context_len, 2 * hidden_size
 
         # Concat attn_output to context_hiddens to get blended_reps
         blended_reps = tf.concat([attn_output, self_attn_output], axis=2) # (batch_size, context_len, hidden_size*4)

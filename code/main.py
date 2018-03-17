@@ -24,6 +24,7 @@ import sys
 import logging
 
 import tensorflow as tf
+import numpy as np
 
 from qa_model import QAModel
 from qa_bidaf_model import QABidafModel
@@ -43,15 +44,15 @@ EXPERIMENTS_DIR = os.path.join(MAIN_DIR, "experiments") # relative path of exper
 
 # High-level options
 tf.app.flags.DEFINE_integer("gpu", 0, "Which GPU to use, if you have multiple.")
-tf.app.flags.DEFINE_string("mode", "train", "Available modes: train / show_examples / official_eval")
+tf.app.flags.DEFINE_string("mode", "train", "Available modes: train / show_examples / official_eval / getinfo")
 tf.app.flags.DEFINE_string("experiment_name", "", "Unique name for your experiment. This will create a directory by this name in the experiments/ directory, which will hold all data related to this experiment")
 tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means train indefinitely")
 
 # Model options
-tf.app.flags.DEFINE_string("model_name", "bidaf", "Define the model to be used.")
+tf.app.flags.DEFINE_string("model_name", "bidaf", "Define the model to be used: baseline/bidaf/selfattn")
 tf.app.flags.DEFINE_string("rnn_cell", "GRU", "Choose RNN cell GRU/LSTM")
 tf.app.flags.DEFINE_integer("num_layers", 1, "Choose num of layers for embedding")
-tf.app.flags.DEFINE_integer("selfattn_size", 50, "Choose size of self attention vectors.")
+tf.app.flags.DEFINE_integer("selfattn_size", 100, "Choose size of self attention vectors.")
 tf.app.flags.DEFINE_string("select_mode", "default", "Choose start/end position selection heuristic. default/endafter")
 
 # Hyperparameters
@@ -151,7 +152,6 @@ def main(unused_argv):
         print("Using baseline model")
         qa_model = QABaselineModel(FLAGS, id2word, word2id, emb_matrix)
     elif FLAGS.model_name == "bidaf":
-        print("Using BIDAF model")
         qa_model = QABidafModel(FLAGS, id2word, word2id, emb_matrix)
     elif FLAGS.model_name == "selfattn":
         print("Using Self Attention")
@@ -222,6 +222,32 @@ def main(unused_argv):
 
             # Show examples with F1/EM scores
             _, _ = qa_model.check_f1_em(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10, print_to_screen=True)
+
+    elif FLAGS.mode == "visualize":
+        with tf.Session(config=config) as sess:
+
+            # Load best model
+            initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
+
+            # Visualize distribution of begin and end spans.
+            begin_total, end_total, f1_em_scores = qa_model.get_spans(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev")
+            np.save(os.path.join(FLAGS.train_dir, "begin_span"), begin_total)
+            np.save(os.path.join(FLAGS.train_dir, "end_span"), end_total)
+            np.save(os.path.join(FLAGS.train_dir, "f1_em"), f1_em_scores)
+
+            # Visualize distribution of Context to Question attention
+            c2q_attn = qa_model.get_c2q_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
+            np.save(os.path.join(FLAGS.train_dir, "c2q_attn"), c2q_attn)
+            q2c_attn = qa_model.get_q2c_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
+            if len(q2c_attn > 0):
+                np.save(os.path.join(FLAGS.train_dir, "q2c_attn"), q2c_attn)
+            else:
+                print 'This model doesn\'t have question to context attention'
+            self_attn = qa_model.get_self_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
+            if len(self_attn > 0):
+                np.save(os.path.join(FLAGS.train_dir, "self_attn"), self_attn)
+            else:
+                print 'This model deosn\'t have self attention'
 
 
     elif FLAGS.mode == "official_eval":

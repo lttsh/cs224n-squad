@@ -206,7 +206,7 @@ class SelfAttn(object):
             # Apply dropout
             output = tf.nn.dropout(output, self.keep_prob)
 
-            return output
+            return self_attn_dist, output
 
 class BidirectionAttn(object):
     """Module for bidirectional Attention.
@@ -243,21 +243,11 @@ class BidirectionAttn(object):
             initializer=tf.contrib.layers.xavier_initializer()) # 2 * H
 
         # Compute matrix  of size BS x N x M x 2H which contains all c_i o q_j
-        q_tile = tf.tile(tf.expand_dims(questions, 0), [N, 1, 1, 1]) #  N x BS x M x 2H
-        q_tile = tf.transpose(q_tile, (1, 0, 3, 2)) # BS x N x 2H x M
-
-        contexts = tf.expand_dims(contexts, -1) # BS x N x 2H x 1
-        # c_tile = tf.tile(contexts, [1, 1, 1, M]) # BS x N x 2H x M
-        result = (contexts * q_tile) # BS x N x 2H x M
-        tf.assert_equal(tf.shape(result), [BS, N, 2 * H, M])
-        result = tf.transpose(result, (0, 1, 3, 2)) # BS x N x M x 2H
-        result = tf.reshape(result, (-1, N * M, 2 * H)) # BS x (NxM) x 2H
-        tf.assert_equal(tf.shape(result), [BS, N*M, 2*H])
-
+        CW = tf.reshape(tf.reshape(contexts, (-1, 2 * H)) * tf.expand_dims(w_sim_3, 0), (-1, N, 2*H)) # BS x N x 2H
         #Compute all dot products
         term1 = tf.reshape(tf.matmul(tf.reshape(contexts, (BS * N, 2*H)), tf.expand_dims(w_sim_1, -1)), (-1, N)) # BS x N
         term2 = tf.reshape(tf.matmul(tf.reshape(questions, (BS * M, 2 * H)), tf.expand_dims(w_sim_2, -1)), (-1, M)) # BS x M
-        term3 = tf.reshape(tf.matmul(tf.reshape(result, (BS * N * M, 2*H)), tf.expand_dims(w_sim_3, -1)), (-1, N, M)) # BS x NM
+        term3 = tf.matmul(CW, tf.transpose(questions, [0, 2, 1])) # BS x N x M
         S = tf.reshape(term1,(-1, N, 1)) + term3 + tf.reshape(term2, (-1, 1, M))
         print("Building Similarity Matrix")
         return S
@@ -276,6 +266,9 @@ class BidirectionAttn(object):
             1s where there's real input, 0s where there's padding
 
         Outputs:
+          alpha : tensor shape (batch_size, context_len, question_len) attention distribution
+          of context on questions
+          beta : tensor shape (batch_size, context_len) attention distribution for context.
           values_output: Tensor shape (batch_size, context_len, 4 * hidden_size).
             This is the attention output; the weighted sum of the values
             (using the attention distribution as weights) concatenated with a
@@ -316,7 +309,7 @@ class BidirectionAttn(object):
             # output = tf.Print(output, [output])
             # Apply dropout
             output = tf.nn.dropout(output, self.keep_prob)
-            return output
+            return alpha, tf.reshape(beta, (-1, N)), output
 
 class BasicAttn(object):
     """Module for basic attention.

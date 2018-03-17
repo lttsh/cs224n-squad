@@ -60,6 +60,9 @@ class QABidafModel(QAModel):
             Important: these are -large in the pad locations. Necessary for when we feed into the cross entropy function.
           self.probdist_start, self.probdist_end: Both shape (batch_size, context_len). Each row sums to 1.
             These are the result of taking (masked) softmax of logits_start and logits_end.
+          self.c2q_dist : (batch_size, context_len, question_len) Context to Question attention probability. Each row should sum to 1
+          except if the context word is masked.
+          self.q2c_dist : (batch_size, context_len) Question to Context attention probability. Each row should sum to 1.
         """
         print("Building BIDAF")
         # Use a RNN to get hidden states for the context and the question
@@ -71,7 +74,8 @@ class QABidafModel(QAModel):
 
         # Use context hidden states to attend to question hidden states
         attn_layer = BidirectionAttn(self.keep_prob, self.FLAGS.hidden_size)
-        attn_output = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens, self.context_mask) # attn_output is shape (batch_size, context_len, hidden_size*4)
+        self.c2q_attn_dist, self.q2c_attn_dist, attn_output = \
+            attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens, self.context_mask) # attn_output is shape (batch_size, context_len, hidden_size*4)
 
         # Concat attn_output to context_hiddens to get blended_reps
         blended_reps = tf.concat([context_hiddens, attn_output], axis=2) # (batch_size, context_len, hidden_size*8)

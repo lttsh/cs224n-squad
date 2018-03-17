@@ -263,7 +263,7 @@ def main(unused_argv):
             initialize_model(sess, qa_model, FLAGS.ckpt_load_dir, expect_exists=True)
 
             distributions = generate_distributions(sess, qa_model, word2id, qn_uuid_data, context_token_data, qn_token_data)
-            # np uuid -> (2, context_len)
+            # np uuid -> [start_dist, end_dist]
             # Write the uuid->answer mapping a to json file in root dir
             save_path= os.path.join(FLAGS.ensemble_dir, "distribution_" + FLAGS.model_name+ '.json')
             print "Writing distributions to %s..." % save_path
@@ -274,18 +274,18 @@ def main(unused_argv):
     elif FLAGS.mode == "ensemble_predict":
         if FLAGS.json_in_path == "":
             raise Exception("For ensembling mode, you need to specify --json_in_path")
-        models = ['baseline']
+        models = ['baseline', 'baseline2']
         distributions = [os.path.join(FLAGS.ensemble_dir, "distribution_" + m + ".json") for m in models]
         total_dict = {}
         for d in distributions:
             with open(d) as prediction_file:
+                print d
                 predictions = json.load(prediction_file)
                 for (key, item) in predictions.items():
                     if total_dict.get(key, None) is None:
                         total_dict[key] = np.asarray(item)
                     else:
-                        total_dict[key][0] += item[0]
-                        total_dict[key][1] += item[1]
+                        total_dict[key] += np.asarray(item)
 
         for (key, item) in total_dict.items():
             total_dict[key][0]/=len(models)

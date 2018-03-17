@@ -91,27 +91,23 @@ class QAPointerModel(QAModel):
         self_attention_encoder = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob, num_layers=self.FLAGS.num_layers, name="AttentionEncoder")
         blended_reps = self_attention_encoder.build_graph(blended_reps, self.context_mask) # batch_size, context_len, hidden_size * 2
 
+        # MODELING LAYER
+        modeling_encoder = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob, num_layers=self.FLAGS.num_layers, name="ModelingEncoder")
+        modeling_output = modeling_encoder.build_graph(blended_reps, self.context_mask)
+        modeling_encoder_two = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob, num_layers=self.FLAGS.num_layers, name="ModelingEncoder2")
+        modeling_output_two = modeling_encoder_two.build_graph(modeling_output, self.context_mask)
+
+        total_reps_start = tf.concat([blended_reps, modeling_output], axis=2)
+        total_reps_end = tf.concat([blended_reps, modeling_output_two], axis=2)
+
         # OUTPUT LAYER
+        with vs.variable_scope("StartDist"):
+            softmax_layer_start = SimpleSoftmaxLayer()
+            self.logits_start, self.probdist_start = softmax_layer_start.build_graph(total_reps_start, self.context_mask)
 
-        from tensorflow.python.ops.rnn_cell import DropoutWrapper
-        from tensorflow.python.ops import rnn_cell
-        from modules import masked_softmax
-        input_lens = tf.reduce_sum( self.context_mask, reduction_indices=1) # shape (batch_size)
-        output_gru_cell = DropoutWrapper(rnn_cell.GRUCell(2 * self.FLAGS.hidden_size), input_keep_prob=self.keep_prob)
-        _, hidden_state = tf.nn.dynamic_rnn(
-            output_gru_cell,
-            blended_reps, sequence_length=input_lens, dtype=tf.float32) # batch_size, 2*H
 
-        start_attention = BasicAttn(self.keep_prob, 2 * self.FLAGS.hidden_size, 2 * self.FLAGS.hidden_size)
-        attn_dist, output = start_attention.build_graph(blended_reps, self.context_mask, tf.expand_dims(hidden_state, axis=1))
-
-        self.probdist_start = tf.reshape(attn_dist, shape=tf.shape(self.context_mask))
-        self.logits_start, _ = masked_softmax(self.probdist_start, self.context_mask, 1)
-        _, hidden_state = tf.nn.dynamic_rnn(
-            output_gru_cell,
-            output, initial_state=hidden_state, sequence_length=input_lens, dtype=tf.float32)
-        end_attention = BasicAttn(self.keep_prob, 2 * self.FLAGS.hidden_size, 2 * self.FLAGS.hidden_size)
-        attn_dist, _ = end_attention.build_graph(blended_reps, self.context_mask, tf.expand_dims(hidden_state, axis=1)) # (batch_size, 1, context_len)
-
-        self.probdist_end = tf.reshape(attn_dist, shape=tf.shape(self.context_mask))
-        self.logits_end, _ = masked_softmax(self.probdist_end, self.context_mask, 1)
+        # Use softmax layer to compute probability distribution for end location
+        # Note this produces self.logits_end and self.probdist_end, both of which have shape (batch_size, context_len)
+        with vs.variable_scope("EndDist"):
+            softmax_layer_end = SimpleSoftmaxLayer()
+            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(total_reps_end, self.context_mask)

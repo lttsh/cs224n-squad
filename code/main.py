@@ -31,6 +31,7 @@ from qa_bidaf_model import QABidafModel
 from qa_baseline_model import QABaselineModel
 from qa_selfattn_model import QASelfAttnModel
 from qa_stack_model import QAStackModel
+from qa_pointer_model import QAPointerModel
 from vocab import get_glove
 from official_eval_helper import get_json_data, generate_answers
 
@@ -158,6 +159,9 @@ def main(unused_argv):
     elif FLAGS.model_name == "stack":
         print("Using stack BIDAF/SA")
         qa_model = QAStackModel(FLAGS, id2word, word2id, emb_matrix)
+    elif FLAGS.model_name == "pointer":
+        print ("Using pointer model")
+        qa_model= QAPointerModel(FLAGS, id2word, word2id, emb_matrix)
 
     # Some GPU settings
     config=tf.ConfigProto()

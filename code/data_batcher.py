@@ -93,7 +93,7 @@ def padded(token_batch, batch_pad=0):
     return map(lambda token_list: token_list + [PAD_ID] * (maxlen - len(token_list)), token_batch)
 
 
-def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size, context_len, question_len, discard_long, random=True):
+def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size, context_len, question_len, discard_long, dorandom=True):
     """
     Adds more batches into the "batches" list.
 
@@ -153,7 +153,7 @@ def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size
 
     # Sort by question length
     # Note: if you sort by context length, then you'll have batches which contain the same context many times (because each context appears several times, with different questions)
-    if random:
+    if dorandom:
         examples = sorted(examples, key=lambda e: len(e[2]))
 
     # Make into batches and append to the list batches
@@ -165,7 +165,7 @@ def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size
         batches.append((context_ids_batch, context_tokens_batch, qn_ids_batch, qn_tokens_batch, ans_span_batch, ans_tokens_batch))
 
     # shuffle the batches
-    if random:
+    if dorandom:
         random.shuffle(batches)
 
     toc = time.time()

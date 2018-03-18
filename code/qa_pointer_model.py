@@ -73,7 +73,7 @@ class QAPointerModel(QAModel):
 
         # BIDAG LAYER
         bidaf_layer = BidirectionAttn(self.keep_prob, self.FLAGS.hidden_size)
-        bidaf_output = bidaf_layer.build_graph(
+        _, _, bidaf_output = bidaf_layer.build_graph(
           question_hiddens,
           self.qn_mask,
           context_hiddens,
@@ -84,7 +84,7 @@ class QAPointerModel(QAModel):
 
         #SELF ATTENTION LAYER
         self_attn_layer = SelfAttn(self.keep_prob, 8 * self.FLAGS.hidden_size, self.FLAGS.selfattn_size)
-        self_attn_output = self_attn_layer.build_graph(bidaf_output, self.context_mask) # batch_size, context_len, 8 * hidden_size
+        _, self_attn_output = self_attn_layer.build_graph(bidaf_output, self.context_mask) # batch_size, context_len, 8 * hidden_size
 
         # Concat attn_output to context_hiddens to get blended_reps
         blended_reps = tf.concat([bidaf_output, self_attn_output], axis=2) # (batch_size, context_len, hidden_size*16)

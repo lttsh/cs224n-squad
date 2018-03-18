@@ -36,9 +36,9 @@ Filter based on a condition function
 
 def get_samples_with_conditions(samples, condition, num_samples=0, random=True):
     indices = np.where(condition(samples))[0]
-    if num_samples != 0:
+    if num_samples > 0:
         if random:
-            np.random.choice(indices, num_samples)
+            return np.random.choice(indices, num_samples)
         else:
             return indices[:num_samples]
     else:
@@ -133,11 +133,14 @@ if __name__ == "__main__":
     get_question_type_stat("how ")
     print ("Who stat")
     get_question_type_stat("who ")
-
-    failures = get_samples_with_conditions(f1_em, lambda s: s[:, 0]==1.0)
+    num_samples=5
+    failures = get_samples_with_conditions(f1_em, lambda s: s[:, 0]==0.0, num_samples = 5, random=True)
+    print failures
     save_path = 'experiments/' + experiment_name + '/visualization/'
-    for i in range(10):
+    keyword='failures'
+    for i in range(num_samples):
         index = failures[i]
-        visualize_attention(c2q_dist, split_token(contexts), split_token(questions), index, save_path+'attention_em_' + str(index) + '.png')
-        visualize_spans(begin_probs, end_probs, split_token(contexts), index, save_path + 'spans_em_' + str(index) + '.png')
-        visualize_q2c_attention(q2c_dist, split_token(contexts), index, save_path + 'q2c_attention_em' + str(index) + '.png')
+        print index
+        visualize_attention(c2q_dist, split_token(contexts), split_token(questions), index, save_path+'attention' + keyword + str(index) + '.png')
+        visualize_spans(begin_probs, end_probs, split_token(contexts), index, save_path + 'spans' + keyword + str(index) + '.png')
+        visualize_q2c_attention(q2c_dist, split_token(contexts), index, save_path + 'q2c_attention' + keyword + str(index) + '.png')

@@ -36,7 +36,6 @@ def plot_histogram(data, label=''):
     plt.hist(data, bins=100, normed=1, alpha=1.0)
     plt.xlabel('Lengths')
     plt.ylabel('Probability')
-    plt.title('Histogram for ' + label)
     plt.grid(True)
 
 
@@ -58,11 +57,15 @@ if __name__ == "__main__":
     plot_histogram([len(question) for question in q], 'questions')
     plt.savefig(save_path + 'questions.png')
     plt.clf()
-    plot_histogram(s[:, 0], 'begin-spans')
-    plt.savefig(save_path + 'begin_spans.png')
-    plt.clf()
-    plot_histogram(s[:, 1], 'end-spans')
-    plt.savefig(save_path + 'end_spans.png')
+    data = [s[:, 0], s[:,1]]
+    bins = np.linspace(0, 300, 50)
+    label=['begin', 'end']
+    plt.hist(data, label=label, bins=bins, normed=1, alpha=1.0)
+    plt.xlabel('Lengths')
+    plt.ylabel('Probability')
+    plt.legend(prop={'size': 20})
+    plt.grid(True)
+    plt.savefig(save_path + 'spans.png')
     plt.clf()
 
     answers= []

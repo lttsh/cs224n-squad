@@ -48,6 +48,7 @@ def get_question_type_stat(keyword, questions, f1_em):
     questions_ind = get_samples_with_conditions(questions, lambda s : find(s[:], keyword) >= 0)
     f1_em_type = [f1_em[i] for i in questions_ind]
     print np.mean(f1_em_type, axis=0)
+    print (1.0 * len(questions_ind)) / len(questions)
 
 def get_answer_length_stat(length, lengths, f1_em):
     questions_ind = [i for i in range(len(lengths)) if lengths[i] > length]
@@ -96,6 +97,22 @@ def visualize_q2c_attention(attention, contexts, index, filename):
     plt.savefig(filename)
     plt.close()
 
+def visualize_self_attention(attention, contexts, index, filename):
+    # Assume attention is of size (N, Context_lenn Context_len)
+    plt.clf()
+    context = contexts[index]
+    if len(contexts[index]) > 300:
+        context = contexts[index][:300]
+    real_context_len = len(context)
+    df_cm = pd.DataFrame(attention[index, :real_context_len, :real_context_len],
+                  index = [i.decode("utf-8") for i in context], columns=[i.decode("utf-8") for i in context])
+    sn.set(font_scale=0.75)
+    fig, ax = plt.subplots(
+        figsize=(8,25))
+    sn.heatmap(df_cm, annot=False, square=False, xticklabels=1, yticklabels=1, ax=ax,cmap="YlGnBu")
+    plt.savefig(filename)
+    plt.close()
+
 def visualize_spans(begin_probs, end_probs, contexts, index, filename):
     plt.clf()
     context = contexts[index]
@@ -124,6 +141,8 @@ if __name__ == "__main__":
     c2q_dist = np.load('experiments/' + experiment_name + '/c2q_attn.npy')
     print c2q_dist.shape
     q2c_dist = np.load('experiments/' + experiment_name + '/q2c_attn.npy')
+    self_dist = np.load('experiments/' + experiment_name + '/self_attn.npy')
+    print self_dist.shape
     end_answer = np.argmax(end_probs, axis=1)
     begin_answer = np.argmax(begin_probs, axis=1)
     model_answer = np.stack([begin_answer, end_answer], axis=1)
@@ -150,19 +169,30 @@ if __name__ == "__main__":
         answer_lengths = [i for i in range(len(lengths)) if lengths[i] > length]
         print (np.mean(f1_em[answer_lengths], axis=0))
 
-    success = get_samples_with_conditions(f1_em, lambda s: s[:, 0]<=0.7, num_samples =0, random=False)
-    tokenized_context = split_token(contexts)
-    short_contexts = [i for i in range(len(tokenized_context)) if  len(tokenized_context[i]) < 100]
-    print ("There are %d short contexts" % len(short_contexts))
+    print ("Percentage of answers with end span before begin span")
+    end_before_begin = [i for i in range(len(model_answer)) if model_answer[i][1] < model_answer[i][0]]
+    print (1.0 * len(end_before_begin)) / len(model_answer)
 
-    question_word =""
-    # why_questions = get_samples_with_conditions(questions, lambda s : find(s[:], question_word) >= 0, num_samples=0, random=False)
-    indices = list(set(success).intersection(short_contexts))
-    print indices
+
     save_path = 'experiments/' + experiment_name + '/visualization/'
-    keyword='borderline_'+question_word
-    for index in indices[:10]:
-        print index
-        visualize_attention(c2q_dist, split_token(contexts), split_token(questions), index, save_path+'attention' + keyword + str(index) + '.png')
-        visualize_spans(begin_probs, end_probs, split_token(contexts), index, save_path + 'spans' + keyword + str(index) + '.png')
-        visualize_q2c_attention(q2c_dist, split_token(contexts), index, save_path + 'q2c_attention' + keyword + str(index) + '.png')
+    visualize_self_attention(self_dist, split_token(contexts), 0, save_path+'self_attention'  + str(0) + '.png')
+    # for index in end_before_begin[:10]:
+    #     print index
+    #     visualize_attention(c2q_dist, split_token(contexts), split_token(questions), index, save_path+'attention' + 'end_before_begin' + str(index) + '.png')
+    #     visualize_spans(begin_probs, end_probs, split_token(contexts), index, save_path + 'spans' + 'end_before_begin' + str(index) + '.png')
+    #     visualize_q2c_attention(q2c_dist, split_token(contexts), index, save_path + 'q2c_attention' + 'end_before_begin' + str(index) + '.png')
+    # success = get_samples_with_conditions(f1_em, lambda s: s[:, 0]<=0.7, num_samples =0, random=False)
+    # tokenized_context = split_token(contexts)
+    # short_contexts = [i for i in range(len(tokenized_context)) if  len(tokenized_context[i]) < 100]
+    # print ("There are %d short contexts" % len(short_contexts))
+
+    # question_word =""
+    # # why_questions = get_samples_with_conditions(questions, lambda s : find(s[:], question_word) >= 0, num_samples=0, random=False)
+    # indices = list(set(success).intersection(short_contexts))
+    # print indices
+    # keyword='borderline_'+question_word
+    # for index in indices[:10]:
+    #     print index
+    #     visualize_attention(c2q_dist, split_token(contexts), split_token(questions), index, save_path+'attention' + keyword + str(index) + '.png')
+    #     visualize_spans(begin_probs, end_probs, split_token(contexts), index, save_path + 'spans' + keyword + str(index) + '.png')
+    #     visualize_q2c_attention(q2c_dist, split_token(contexts), index, save_path + 'q2c_attention' + keyword + str(index) + '.png')

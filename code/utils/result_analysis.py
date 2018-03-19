@@ -101,10 +101,10 @@ def visualize_self_attention(attention, contexts, index, filename):
     # Assume attention is of size (N, Context_lenn Context_len)
     plt.clf()
     context = contexts[index]
-    if len(contexts[index]) > 300:
-        context = contexts[index][:300]
+    if len(contexts[index]) > 200:
+        context = contexts[index][:200]
     real_context_len = len(context)
-    df_cm = pd.DataFrame(attention[index, :real_context_len, :real_context_len],
+    df_cm = pd.DataFrame(attention[0, index, :real_context_len, :real_context_len],
                   index = [i.decode("utf-8") for i in context], columns=[i.decode("utf-8") for i in context])
     sn.set(font_scale=0.75)
     fig, ax = plt.subplots(
@@ -175,7 +175,11 @@ if __name__ == "__main__":
 
 
     save_path = 'experiments/' + experiment_name + '/visualization/'
-    visualize_self_attention(self_dist, split_token(contexts), 0, save_path+'self_attention'  + str(0) + '.png')
+    for index in range(20):
+        visualize_self_attention(self_dist, split_token(contexts), index, save_path+'self_attention'  + str(index) + '.png')
+        visualize_attention(c2q_dist, split_token(contexts), split_token(questions), index, save_path+'attention' + 'end_before_begin' + str(index) + '.png')
+        visualize_spans(begin_probs, end_probs, split_token(contexts), index, save_path + 'spans' + 'end_before_begin' + str(index) + '.png')
+        visualize_q2c_attention(q2c_dist, split_token(contexts), index, save_path + 'q2c_attention' + 'end_before_begin' + str(index) + '.png')
     # for index in end_before_begin[:10]:
     #     print index
     #     visualize_attention(c2q_dist, split_token(contexts), split_token(questions), index, save_path+'attention' + 'end_before_begin' + str(index) + '.png')

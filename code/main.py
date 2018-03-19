@@ -243,11 +243,11 @@ def main(unused_argv):
                 np.save(os.path.join(FLAGS.train_dir, "q2c_attn"), q2c_attn)
             else:
                 print 'This model doesn\'t have question to context attention'
-             self_attn = qa_model.get_self_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=20)
-             if len(self_attn > 0):
+            self_attn = qa_model.get_self_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=20)
+            if len(self_attn > 0):
                  np.save(os.path.join(FLAGS.train_dir, "self_attn"), self_attn)
-             else:
-                print 'This model deosn\'t have self attention'
+            else:
+                print 'This model doesn\'t have self attention'
 
 
     elif FLAGS.mode == "ensemble_write":

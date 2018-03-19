@@ -631,7 +631,7 @@ class QAModel(object):
             self_list = self_dists.tolist() # list length batch_size
             for _, (self_dist) in enumerate(self_list):
                 example_num += 1
-                total_self_attention.append(self_dists)
+                total_self_attention.append(self_dist)
                 # print_example(self.word2id, batch.context_tokens[ex_idx], batch.qn_tokens[ex_idx], batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start, pred_ans_end, true_answer, pred_answer, f1, em)
                 if num_samples != 0 and example_num >= num_samples:
                     break

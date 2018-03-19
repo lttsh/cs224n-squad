@@ -228,7 +228,6 @@ def main(unused_argv):
 
             # Load best model
             initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
-
             # Get distribution of begin and end spans.
             begin_total, end_total, f1_em_scores = qa_model.get_spans(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev")
             np.save(os.path.join(FLAGS.train_dir, "begin_span"), begin_total)

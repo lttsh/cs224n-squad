@@ -44,11 +44,15 @@ def get_samples_with_conditions(samples, condition, num_samples=0, random=True):
     else:
         return indices
 
-def get_question_type_stat(keyword):
+def get_question_type_stat(keyword, questions, f1_em):
     questions_ind = get_samples_with_conditions(questions, lambda s : find(s[:], keyword) >= 0)
     f1_em_type = [f1_em[i] for i in questions_ind]
     print np.mean(f1_em_type, axis=0)
 
+def get_answer_length_stat(length, lengths, f1_em):
+    questions_ind = [i for i in range(len(lengths)) if lengths[i] > length]
+    f1_em_type = [f1_em[i] for i in questions_ind]
+    print np.mean(f1_em_type, axis=0)
 
 def get_error_type():
     end_before = get_samples_with_conditions(model_answer, lambda s: s[:,0] > s[:,1])
@@ -110,7 +114,10 @@ def visualize_spans(begin_probs, end_probs, contexts, index, filename):
 
 if __name__ == "__main__":
     answers, contexts, questions, spans = load_data()
-    experiment_name = 'stack_pointer'
+    lengths = split_token(spans)
+    lengths = [ int(l[1]) - int(l[0]) for l in lengths]
+    print lengths[0]
+    experiment_name = 'stack_more_size_less_context'
     end_probs = np.load('experiments/' + experiment_name + '/end_span.npy')
     begin_probs = np.load('experiments/' + experiment_name + '/begin_span.npy')
     f1_em = np.load('experiments/' + experiment_name + '/f1_em.npy')
@@ -123,23 +130,38 @@ if __name__ == "__main__":
     print model_answer[:10]
 
     get_error_type()
+    print ("Overall stat")
+    print np.mean(f1_em, axis=0)
     print ("Why stat")
-    get_question_type_stat("why ")
+    get_question_type_stat("why ", questions, f1_em)
     print ("What stat")
-    get_question_type_stat("what ")
+    get_question_type_stat("what ", questions, f1_em)
     print ("When stat")
-    get_question_type_stat("when ")
+    get_question_type_stat("when ", questions, f1_em)
     print ("How stat")
-    get_question_type_stat("how ")
+    get_question_type_stat("how ", questions, f1_em)
     print ("Who stat")
-    get_question_type_stat("who ")
-    num_samples=5
-    failures = get_samples_with_conditions(f1_em, lambda s: s[:, 0]==0.0, num_samples = 5, random=True)
-    print failures
+    get_question_type_stat("who ", questions, f1_em)
+    print ("Where stat")
+    get_question_type_stat("where ", questions, f1_em)
+
+    for length in [1, 5, 10, 20]:
+        print ("Stat for answers of length bigger than %d" % length)
+        answer_lengths = [i for i in range(len(lengths)) if lengths[i] > length]
+        print (np.mean(f1_em[answer_lengths], axis=0))
+
+    success = get_samples_with_conditions(f1_em, lambda s: s[:, 0]<=0.7, num_samples =0, random=False)
+    tokenized_context = split_token(contexts)
+    short_contexts = [i for i in range(len(tokenized_context)) if  len(tokenized_context[i]) < 100]
+    print ("There are %d short contexts" % len(short_contexts))
+
+    question_word =""
+    # why_questions = get_samples_with_conditions(questions, lambda s : find(s[:], question_word) >= 0, num_samples=0, random=False)
+    indices = list(set(success).intersection(short_contexts))
+    print indices
     save_path = 'experiments/' + experiment_name + '/visualization/'
-    keyword='failures'
-    for i in range(num_samples):
-        index = failures[i]
+    keyword='borderline_'+question_word
+    for index in indices[:10]:
         print index
         visualize_attention(c2q_dist, split_token(contexts), split_token(questions), index, save_path+'attention' + keyword + str(index) + '.png')
         visualize_spans(begin_probs, end_probs, split_token(contexts), index, save_path + 'spans' + keyword + str(index) + '.png')

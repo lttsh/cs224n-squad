@@ -33,7 +33,7 @@ def load_data(mode = 'train'):
 Plots histogram for given data
 '''
 def plot_histogram(data, label=''):
-    plt.hist(data, bins=100, normed=1, alpha=0.5)
+    plt.hist(data, bins=100, normed=1, alpha=1.0)
     plt.xlabel('Lengths')
     plt.ylabel('Probability')
     plt.title('Histogram for ' + label)
@@ -63,4 +63,43 @@ if __name__ == "__main__":
     plt.clf()
     plot_histogram(s[:, 1], 'end-spans')
     plt.savefig(save_path + 'end_spans.png')
+    plt.clf()
+
+    answers= []
+    keywords = ["why", "when", "how", "what", "who", "where"]
+    for key in keywords:
+        answers.append([len(answer) for (i, answer) in enumerate(a) if key in q[i]])
+    bins = np.linspace(0, 30, 15)
+    plt.hist(answers, bins, normed=True, label=keywords)
+    plt.xlabel('Lengths')
+    plt.ylabel('Probability')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(save_path + 'answers_questiontype.png')
+    plt.clf()
+
+    contexts= []
+    keywords = ["why", "when", "how", "what", "who", "where"]
+    for key in keywords:
+        contexts.append([len(context) for (i, context) in enumerate(c) if key in q[i]])
+    bins = np.linspace(20, 300, 15)
+    plt.hist(contexts, bins, normed=True, label=keywords)
+    plt.xlabel('Lengths')
+    plt.ylabel('Probability')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(save_path + 'contexts_questiontype.png')
+    plt.clf()
+
+    answers= []
+    keywords = ["why", "when", "how", "what", "who", "where"]
+    for key in keywords:
+        answers.append([len(answer) for (i, answer) in enumerate(q) if key in q[i]])
+    bins = np.linspace(20, 30, 15)
+    plt.hist(answers, bins, normed=True, label=keywords)
+    plt.xlabel('Lengths')
+    plt.ylabel('Probability')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(save_path + 'questions_questiontype.png')
     plt.clf()

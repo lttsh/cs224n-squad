@@ -236,17 +236,17 @@ def main(unused_argv):
             np.save(os.path.join(FLAGS.train_dir, "f1_em"), f1_em_scores)
 
             # Visualize distribution of Context to Question attention
-            c2q_attn = qa_model.get_c2q_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
+            c2q_attn = qa_model.get_c2q_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=0)
             np.save(os.path.join(FLAGS.train_dir, "c2q_attn"), c2q_attn)
-            q2c_attn = qa_model.get_q2c_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
+            q2c_attn = qa_model.get_q2c_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=0)
             if len(q2c_attn > 0):
                 np.save(os.path.join(FLAGS.train_dir, "q2c_attn"), q2c_attn)
             else:
                 print 'This model doesn\'t have question to context attention'
-            self_attn = qa_model.get_self_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10)
-            if len(self_attn > 0):
-                np.save(os.path.join(FLAGS.train_dir, "self_attn"), self_attn)
-            else:
+             self_attn = qa_model.get_self_attention(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=20)
+             if len(self_attn > 0):
+                 np.save(os.path.join(FLAGS.train_dir, "self_attn"), self_attn)
+             else:
                 print 'This model deosn\'t have self attention'
 
 
@@ -274,7 +274,7 @@ def main(unused_argv):
     elif FLAGS.mode == "ensemble_predict":
         if FLAGS.json_in_path == "":
             raise Exception("For ensembling mode, you need to specify --json_in_path")
-        models = ['baseline', 'baseline2']
+        models = ['stack', 'pointer']
         distributions = [os.path.join(FLAGS.ensemble_dir, "distribution_" + m + ".json") for m in models]
         total_dict = {}
         for d in distributions:

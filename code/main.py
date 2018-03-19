@@ -79,6 +79,7 @@ tf.app.flags.DEFINE_string("ckpt_load_dir", "", "For official_eval mode, which d
 tf.app.flags.DEFINE_string("json_in_path", "", "For official_eval mode, path to JSON input file. You need to specify this for official_eval_mode.")
 tf.app.flags.DEFINE_string("json_out_path", "predictions.json", "Output path for official_eval mode. Defaults to predictions.json")
 tf.app.flags.DEFINE_string("ensemble_dir", "", "Directory to put the ensemble outputs.")
+tf.app.flags.DEFINE_string("ensemble_name", "", "Name of the output file containing the probability outputs.")
 
 FLAGS = tf.app.flags.FLAGS
 os.environ["CUDA_VISIBLE_DEVICES"] = str(FLAGS.gpu)
@@ -123,7 +124,8 @@ def main(unused_argv):
     print "This code was developed and tested on TensorFlow 1.4.1. Your TensorFlow version: %s" % tf.__version__
 
     # Define train_dir
-    if not FLAGS.experiment_name and not FLAGS.train_dir and FLAGS.mode != "official_eval" and FLAGS.mode!= "ensemble_write":
+    if not FLAGS.experiment_name and not FLAGS.train_dir and \
+            FLAGS.mode != "official_eval" and FLAGS.mode!= "ensemble_write" and FLAGS.mode!= "ensemble_predict":
         raise Exception("You need to specify either --experiment_name or --train_dir")
     FLAGS.train_dir = FLAGS.train_dir or os.path.join(EXPERIMENTS_DIR, FLAGS.experiment_name)
 
@@ -228,7 +230,6 @@ def main(unused_argv):
 
             # Load best model
             initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
-
             # Get distribution of begin and end spans.
             begin_total, end_total, f1_em_scores = qa_model.get_spans(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev")
             np.save(os.path.join(FLAGS.train_dir, "begin_span"), begin_total)
@@ -255,6 +256,8 @@ def main(unused_argv):
             raise Exception("For ensembling mode, you need to specify --json_in_path")
         if FLAGS.ckpt_load_dir == "":
             raise Exception("For ensembling mode, you need to specify --ckpt_load_dir")
+        if FLAGS.ensemble_name == "":
+            raise Exception("For ensembling mode, you need to specify --ensemble_name")
         # Read the JSON data from file
         qn_uuid_data, context_token_data, qn_token_data = get_json_data(FLAGS.json_in_path)
 
@@ -265,11 +268,11 @@ def main(unused_argv):
             distributions = generate_distributions(sess, qa_model, word2id, qn_uuid_data, context_token_data, qn_token_data)
             # np uuid -> [start_dist, end_dist]
             # Write the uuid->answer mapping a to json file in root dir
-            save_path= os.path.join(FLAGS.ensemble_dir, "distribution_" + FLAGS.model_name+ '.json')
+            save_path= os.path.join(FLAGS.ensemble_dir, "distribution_" + FLAGS.ensemble_name+ '.json')
             print "Writing distributions to %s..." % save_path
             with io.open(save_path, 'w', encoding='utf-8') as f:
                 f.write(unicode(json.dumps(distributions, ensure_ascii=False)))
-                print "Wrote predictions to %s" % save_path
+                print "Wrote distributions to %s" % save_path
 
     elif FLAGS.mode == "ensemble_predict":
         if FLAGS.json_in_path == "":

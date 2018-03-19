@@ -33,10 +33,9 @@ def load_data(mode = 'train'):
 Plots histogram for given data
 '''
 def plot_histogram(data, label=''):
-    plt.hist(data, bins=100, normed=1, alpha=0.5)
+    plt.hist(data, bins=100, normed=1, alpha=1.0)
     plt.xlabel('Lengths')
     plt.ylabel('Probability')
-    plt.title('Histogram for ' + label)
     plt.grid(True)
 
 
@@ -58,9 +57,52 @@ if __name__ == "__main__":
     plot_histogram([len(question) for question in q], 'questions')
     plt.savefig(save_path + 'questions.png')
     plt.clf()
-    plot_histogram(s[:, 0], 'begin-spans')
-    plt.savefig(save_path + 'begin_spans.png')
+    data = [s[:, 0], s[:,1]]
+    bins = np.linspace(0, 300, 50)
+    label=['begin', 'end']
+    plt.hist(data, label=label, bins=bins, normed=1, alpha=1.0)
+    plt.xlabel('Lengths')
+    plt.ylabel('Probability')
+    plt.legend(prop={'size': 20})
+    plt.grid(True)
+    plt.savefig(save_path + 'spans.png')
     plt.clf()
-    plot_histogram(s[:, 1], 'end-spans')
-    plt.savefig(save_path + 'end_spans.png')
+
+    answers= []
+    keywords = ["why", "when", "how", "what", "who", "where"]
+    for key in keywords:
+        answers.append([len(answer) for (i, answer) in enumerate(a) if key in q[i]])
+    bins = np.linspace(0, 30, 15)
+    plt.hist(answers, bins, normed=True, label=keywords)
+    plt.xlabel('Lengths')
+    plt.ylabel('Probability')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(save_path + 'answers_questiontype.png')
+    plt.clf()
+
+    contexts= []
+    keywords = ["why", "when", "how", "what", "who", "where"]
+    for key in keywords:
+        contexts.append([len(context) for (i, context) in enumerate(c) if key in q[i]])
+    bins = np.linspace(20, 300, 15)
+    plt.hist(contexts, bins, normed=True, label=keywords)
+    plt.xlabel('Lengths')
+    plt.ylabel('Probability')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(save_path + 'contexts_questiontype.png')
+    plt.clf()
+
+    answers= []
+    keywords = ["why", "when", "how", "what", "who", "where"]
+    for key in keywords:
+        answers.append([len(answer) for (i, answer) in enumerate(q) if key in q[i]])
+    bins = np.linspace(20, 30, 15)
+    plt.hist(answers, bins, normed=True, label=keywords)
+    plt.xlabel('Lengths')
+    plt.ylabel('Probability')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(save_path + 'questions_questiontype.png')
     plt.clf()

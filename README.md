@@ -4,7 +4,7 @@
 Code for the Default Final Project (SQuAD) for [CS224n](http://web.stanford.edu/class/cs224n/), Winter 2018. The goal of the project is to tackle the question answering problem on the Stanford Question Answering Dataset. 
 Given a short text (context) and a reading comprehension question, the model is expected to output the answer to the question. As a simplification, in the SQuAD dataset, the answer is a subtext of the context. 
 
-Details on the implementation, experiments and models can be found in the [report](http://web.stanford.edu/class/cs224n/reports/6904508.pdf).
+Details on the implementation, experiments and models can be found in the [report](http://web.stanford.edu/class/cs224n/reports/6904508.pdf) and the [poster](https://drive.google.com/file/d/1zW3rdprpoyvh9kB04Jgw3lpkV0sNjNlR/view?usp=sharing).
 
 ## Code description 
 The code was developed and tested with Python 2.7 and Tensorflow 1.4.
